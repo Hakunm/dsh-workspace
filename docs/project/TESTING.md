@@ -33,6 +33,7 @@ CI 在 Windows、Ubuntu 和 macOS 执行相同核心门禁。Playwright 另外�
 
 | 日期 | 环境 | 命令 | 结果 |
 | --- | --- | --- | --- |
+| 2026-10-26 | Cloud VM / Node 22.23.4 / DSH `dsh-v0.2.1-rc.3` | `pnpm check` + `pnpm exec tsx scripts/smoke-profile-install.ts /tmp/dsh-rc3 …` | 通过；24 项 Vitest、docs:check、build 与 profile 安装/compose 均成功；Host 注入更新为 session/workspace/settings/credentials/llm/agentPresets/webServer/agents/commands |
 | 2026-08-15 | ARM64 Oracle / Node 24.19.0 / DSH 0.1.0-rc.6 | 安装命令/TODO/权限版 tarball，确认无运行会话后重启 root `npx @deepseek-ai/dsh web` | 通过；新 PID `3698617`，WebUI `3080` 与 listener `3090` 均正常；真实空白会话 `/commands` 返回 `compact/export/feedback/goal/permission/plan`，组合配置注入 `apiProxy/webServer/agents/commands`；Host SHA-256 `65CCF5E4F5595FE5881D1D331BF2DAC934591DDE2581D6758A9A374F72A00627` |
 | 2026-08-15 | Windows / Node 24 | `pnpm check` | 通过；12 个文件/23 个 Vitest，覆盖 host 命令列举/执行、未知命令拒绝、REST scope 与命令参数不入审计；OpenAPI/Kotlin SDK 文档同步和 Host/Client/standalone bundle 构建成功 |
 | 2026-08-15 | ARM64 Oracle / Node 24.19.0 / DSH 0.1.0-rc.6 | 安装审批 tarball 并按用户要求重启 `npx @deepseek-ai/dsh web` | 通过；新 PID `3669075`，WebUI `127.0.0.1:3080` 返回 200，listener `0.0.0.0:3090` 返回 `{"ok":true,"version":"v1"}`；服务器 Host SHA-256 `598762E2F08F864B41D2506CDBD2E53BCA6A0D5022A95A976651C0623A145824` 与本地一致，安装 OpenAPI 含审批路由 |

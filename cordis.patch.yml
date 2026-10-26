@@ -3,7 +3,7 @@
 - insert:
     - id: dsh-workspace
       name: dsh-workspace
-      inject: [apiProxy, webServer, agents, commands]
+      inject: [sessionController, workspaceController, settingsController, credentialsController, llm, agentPresets, webServer, agents, commands]
       config:
         dataDir: !!js dshHomePath('dsh-workspace')
         remoteHost: 0.0.0.0

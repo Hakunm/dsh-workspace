@@ -38,3 +38,4 @@
 | REL-002 | done | CHAT-005,TEST-001 | `dsh-workspace` v1.0.0 用户文档、版本展示、正式 tarball、独立 Git 仓库和 `v1.0.0` 标签完成 |
 | REL-003 | done | BRAND-002,LICENSE-001,DOC-002 | 重新打包 v1.0.0，以单一根提交重写公开 `main` 与 `v1.0.0` 标签，并替换 Release 校验和与产物 |
 | REL-004 | done | DOC-003,REL-003 | README 刷新后继续以单一根提交重写公开 `main` 与 `v1.0.0` 标签，不保留中间修改历史 |
+| DSH-002 | done | REL-004 | v1.1.0 适配 DSH `dsh-v0.2.1-rc.3`：Host 注入 session/workspace/settings controller 桥接层、审批 waterfall、profile 安装与 `pnpm check` 通过 |

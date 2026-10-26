@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { AuthService } from './host/auth.ts'
 import { DshChatAdapter } from './host/chat-adapter.ts'
+import { createHostDshApi, type HostDshServices } from './host/dsh-host-bridge.ts'
 import { WorkspaceDatabase } from './host/database.ts'
 import { WorkspaceEventBus } from './host/event-bus.ts'
 import { FileService } from './host/file-service.ts'
@@ -11,7 +12,17 @@ import { DshSettingsAdapter } from './host/settings-adapter.ts'
 import { PLUGIN_VERSION } from './shared/version.ts'
 
 export const name = 'dsh-workspace'
-export const inject = ['apiProxy', 'webServer', 'agents', 'commands']
+export const inject = [
+  'sessionController',
+  'workspaceController',
+  'settingsController',
+  'credentialsController',
+  'llm',
+  'agentPresets',
+  'webServer',
+  'agents',
+  'commands',
+]
 
 export interface Config {
   dataDir?: string
@@ -20,13 +31,13 @@ export interface Config {
   maxUploadBytes?: number
 }
 
-interface HostContext {
-  apiProxy: ConstructorParameters<typeof DshChatAdapter>[0] & ConstructorParameters<typeof DshSettingsAdapter>[0]
+interface HostContext extends HostDshServices {
   webServer: Parameters<typeof attachEmbeddedRoutes>[0]
   agents: NonNullable<ConstructorParameters<typeof DshChatAdapter>[2]>['agents']
   commands: NonNullable<ConstructorParameters<typeof DshChatAdapter>[2]>['commands']
   logger: { info(message: string): void; warn(error: Error): void }
   effect(register: () => (() => void | Promise<void>), label?: string): void
+  on(event: string, handler: (...args: unknown[]) => unknown, options?: { global?: boolean }): () => void
 }
 
 export async function apply(ctx: HostContext, config: Config = {}): Promise<void> {
@@ -36,12 +47,13 @@ export async function apply(ctx: HostContext, config: Config = {}): Promise<void
   const maxUploadBytes = config.maxUploadBytes ?? 20 * 1024 * 1024
   if (!Number.isSafeInteger(maxUploadBytes) || maxUploadBytes < 1) throw new Error('dsh-workspace: maxUploadBytes must be positive')
 
+  const api = createHostDshApi(ctx)
   const database = new WorkspaceDatabase(dataDir)
   const events = new WorkspaceEventBus()
   const auth = new AuthService(database)
   const files = new FileService(database, event => events.emit(event))
-  const chat = new DshChatAdapter(ctx.apiProxy, database, { agents: ctx.agents, commands: ctx.commands })
-  const settings = new DshSettingsAdapter(ctx.apiProxy)
+  const chat = new DshChatAdapter(api, database, { agents: ctx.agents, commands: ctx.commands })
+  const settings = new DshSettingsAdapter(api)
   let router!: ApiRouter
   const remote = new RemoteApiServer({
     port,

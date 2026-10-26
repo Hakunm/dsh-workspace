@@ -15,7 +15,7 @@ flowchart LR
   Auth --> DB["node:sqlite state"]
   Files --> Disk["Authorized local roots"]
   Files --> Trash["Plugin trash data"]
-  Chat --> DSH["ctx.apiProxy + ctx.agents + ctx.commands"]
+  Chat --> DSH["DSH host controllers + ctx.agents + ctx.commands"]
   Settings --> DSH
 ```
 
@@ -31,7 +31,7 @@ Web Client 使用独立的外部语言 store 跨多个 DSH slot React 根同步�
 - 外部客户端连接独立 listener。除健康检查和配对交换外，所有请求都需要设备 Bearer token。
 - listener 在 SQLite 中持久化远程绑定 IP 和端口；关闭状态绑定同地址族回环，启用状态绑定配置地址。所有重绑定先保留旧 endpoint，失败时恢复旧 endpoint 后再报告错误。
 - Router 先解析 principal，再检查 scope 和 root grant，最后把 `rootId + relativePath` 交给文件服务。
-- 聊天 adapter 使用 DSH 注入的 `ctx.apiProxy` 处理会话、工作区、模型与消息，并用 `ctx.agents + ctx.commands` 列出/执行 host 斜杠命令；它不转发或依赖 DSH 私有 `/api` HTTP wire。冷会话通过模型查询取得 host agent 后再访问命令注册表。命令执行前仍执行 session/root 授权和当前命令列表校验，且绝不改走模型 prompt。会话创建优先使用 DSH `workspaceId`；工作区发现先读取 `workspace.list`，再按设备授权根过滤并把真实路径改写为 `rootId + relativePath`。新工作区登记先通过文件授权边界解析现有目录，再调用 `workspace.create`。Agent 模式来自 `agentPreset.list`；`agentPreset.select` 只为仍为 `blank` 的授权会话开放，宿主在执行时再次检查以避免首条消息与切换竞态。
+- 聊天 adapter 通过 Host 桥接层调用 DSH 0.2 的 `sessionController`、`workspaceController` 与 `agentPresets` 处理会话、工作区、模型与消息，并用 `ctx.agents + ctx.commands` 列出/执行 host 斜杠命令；它不转发或依赖 DSH 私有 `/api` HTTP wire。冷会话通过模型查询取得 host agent 后再访问命令注册表。命令执行前仍执行 session/root 授权和当前命令列表校验，且绝不改走模型 prompt。会话创建优先使用 DSH `workspaceId`；工作区发现先读取 `workspace.list`，再按设备授权根过滤并把真实路径改写为 `rootId + relativePath`。新工作区登记先通过文件授权边界解析现有目录，再调用 `workspace.create`。Agent 模式来自 `agentPreset.list`；`agentPreset.select` 只为仍为 `blank` 的授权会话开放，宿主在执行时再次检查以避免首条消息与切换竞态。
 - 审批请求由 DSH mux 的 `approval/requested` 驱动，adapter 以 `sessionId + approvalId` 缓存待处理项并把私有 `rpcId` 留在 Host 内；读取时从授权历史提取匹配工具调用，经过脱敏和长度限制后投影。设备只可提交 `allowed-once` 或 `rejected`，Host 再组装 DSH `client-response`；`approval/resolved` 或成功决定会清除缓存，mux 重连的待处理重放用于恢复状态。
 - 设置 adapter 使用 DSH 稳定的 `llm.providers/models/discoverModels`、`settings.describe/mutate` 和 `credentials.describe/set/unset` 服务。读取时合并模板基值与用户覆盖，并用实时模型目录补足继承模型；自定义供应商写入 DSH 的 `llm-pi-ai/providers/<route>` 命名空间，协议选择从 DSH schema 提取。外部接口只投影可显示配置与凭据状态；API 密钥只写不读。会话模型选择继续先执行授权 session 检查。
 - 文件事件和已授权的 DSH mux/host 事件经 WebSocket 广播；`assistant/chunk` 在 BFF 边界被规范化为 `chat.message.delta`，完成消息、会话状态、Agent 切换和审批变化也使用稳定事件名，移动端不解析 DSH 私有事件形状。每次广播重新读取设备状态并检查事件类别 scope 与 root/session，重连后客户端重新读取 REST 基线。
