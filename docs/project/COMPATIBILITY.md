@@ -5,13 +5,13 @@
 | 组件 | 支持范围 | 验证方式 |
 | --- | --- | --- |
 | Node.js | `^22.19.0 || >=24.0.0` | CI 22.19 和 24 |
-| DSH | 源码基线 `master@47f9438`（仓库版本 `0.1.0-rc.5`） | tarball profile 安装、配置组合和真实启动 |
+| DSH | 标签 `dsh-v0.2.1-rc.3`（npm `@deepseek-ai/dsh@0.2.1-rc.3`） | tarball profile 安装、配置组合和真实启动 |
 | Windows | Windows Server 2022 / Windows 11 | `windows-latest` |
 | macOS | GitHub 当前 macOS runner | `macos-latest` |
 | Linux | Ubuntu 当前 LTS runner | `ubuntu-latest` |
 | Android | Android 8.0（API 26）及以上；compile/target SDK 36 | Gradle、lint、单元/UI 测试、Android 15 端到端与签名 Release APK |
 
-当前 npm 上的旧版 DSH 包存在未发布的内部依赖，独立插件开发仓库设置 `auto-install-peers=false`；插件不在运行时导入这些包，而由已启动的 DSH Host 通过 Cordis service 注入 `apiProxy` 和 `webServer`。
+当前 npm 上的旧版 DSH 包存在未发布的内部依赖，独立插件开发仓库设置 `auto-install-peers=false`；插件不在运行时导入这些包，而由已启动的 DSH Host 通过 Cordis service 注入 `sessionController`、`workspaceController`、`settingsController`、`credentialsController`、`llm`、`agentPresets`、`webServer`、`agents` 和 `commands`。
 
 Windows 11 / Node 24.18.0 已完成本地全套验证。GitHub Actions 已配置 Node 22.19/24 核心矩阵、三系统 tarball profile 安装、Ubuntu DSH 真实启动和 JDK 17 SDK 编译；远程仓库创建后才能取得 hosted macOS/Linux 结果。
 

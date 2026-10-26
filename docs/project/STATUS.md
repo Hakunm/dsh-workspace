@@ -1,9 +1,9 @@
 # 当前状态
 
-- 日期：2026-08-15
-- 阶段：`dsh-workspace` v1.0.0 最终发布刷新
-- 当前任务：`REL-004`
-- DSH 基线：`master` / `47f943859bef60e4160492346772ded9b24f765a`
+- 日期：2026-10-26
+- 阶段：`dsh-workspace` v1.1.0 DSH 0.2 适配
+- 当前任务：`DSH-002`
+- DSH 基线：`dsh-v0.2.1-rc.3` / `1f81c047fc48fa190a683e469daa699857e9afe8`
 - DSH 路径：`C:\Users\nyanya\Desktop\dsh\deepseek-harness`
 - 插件路径：`C:\Users\nyanya\Desktop\dsh\dsh-workspace`
 - 已完成：Host/Client 外置插件、DSH WebUI 内文件工作区、授权根与回收站、独立 listener、设备授权、聊天/审批/命令/模型 BFF、OpenAPI/AsyncAPI、Kotlin SDK、中英双语和版本展示

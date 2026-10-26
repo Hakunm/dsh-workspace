@@ -1,6 +1,6 @@
 {
   "name": "dsh-workspace",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A bilingual file workspace and secure remote API for DeepSeek Harness WebUI and mobile clients.",
   "type": "module",
   "packageManager": "pnpm@11.19.0",

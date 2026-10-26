@@ -61,7 +61,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: deepseek-ai/deepseek-harness
-          ref: 47f943859bef60e4160492346772ded9b24f765a
+          ref: dsh-v0.2.1-rc.3
           path: deepseek-harness
       - working-directory: deepseek-harness
         run: pnpm install --frozen-lockfile

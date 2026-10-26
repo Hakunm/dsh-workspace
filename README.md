@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-v1.0.0-087f8c">
+  <img alt="Version" src="https://img.shields.io/badge/version-v1.1.0-087f8c">
   <img alt="DSH plugin" src="https://img.shields.io/badge/DeepSeek_Harness-plugin-1f2328">
   <img alt="Platforms" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-586069">
   <img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-2da44e">
@@ -213,7 +213,7 @@ pnpm check
 pnpm pack
 ```
 
-v1.0.0 基于 DSH `master@47f943859bef60e4160492346772ded9b24f765a` 开发，CI 覆盖 Windows、Ubuntu 和 macOS。
+v1.1.0 基于 DSH `dsh-v0.2.1-rc.3`（npm `@deepseek-ai/dsh@0.2.1-rc.3`）开发，CI 覆盖 Windows、Ubuntu 和 macOS。
 
 ## 项目信息
 

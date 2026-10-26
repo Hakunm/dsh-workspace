@@ -1,5 +1,12 @@
 # 开发日志
 
+## 2026-10-26 · v1.1.0
+
+- 完成 `DSH-002`：适配 DeepSeek Harness `dsh-v0.2.1-rc.3`（`1f81c047fc48fa190a683e469daa699857e9afe8`）。DSH 0.2 移除 `ctx.apiProxy`，插件 Host 改为注入 session/workspace/settings/credentials/llm/agentPresets 控制器，并新增 in-process 桥接层复用现有 chat/settings adapter 与公开 BFF 合约。
+- 审批路径改为订阅 DSH `approval/request` waterfall，并继续通过 `client-response` 兼容路径完成移动端“允许一次/拒绝”。
+- 实时事件改为订阅 Host `session/event`、`api-session/status` 与 `agent-preset/selected`，保持公开 WebSocket 事件 schema 不变。
+- CI profile 安装基线更新为 `dsh-v0.2.1-rc.3`；本机 `pnpm check`（typecheck、24 项 Vitest、docs:check、build）与 `/tmp/dsh-rc3` smoke profile 安装通过。
+
 ## 2026-08-15 · v1.0.0
 
 - 完成 `DOC-003` 与 `REL-004`：按发布要求删除中英文 README 的截图环境说明，并继续以单一根提交同步公开分支和标签。
