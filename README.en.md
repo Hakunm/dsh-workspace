@@ -215,7 +215,7 @@ v1.1.0 was developed against DSH `dsh-v0.2.1-rc.3` (npm `@deepseek-ai/dsh@0.2.1-
 
 ## Project
 
-- Version: `v1.0.0`
+- Version: `v1.1.0`
 - Author: [Github@Hakunm](https://github.com/Hakunm)
 - License: [GNU Affero General Public License v3.0](./LICENSE)
 - Android client: [dsh-android-app](https://github.com/Hakunm/dsh-android-app)
