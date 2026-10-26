@@ -65,7 +65,7 @@ jobs:
           path: deepseek-harness
       - working-directory: deepseek-harness
         run: pnpm install --frozen-lockfile
-      - run: pnpm exec tsx scripts/smoke-profile-install.ts deepseek-harness artifacts/dsh-workspace-1.0.0.tgz
+      - run: pnpm exec tsx scripts/smoke-profile-install.ts deepseek-harness "artifacts/dsh-workspace-$(node -p "require('./package.json').version").tgz"
       - if: matrix.os == 'ubuntu-latest'
         working-directory: deepseek-harness
         run: pnpm build
@@ -74,12 +74,14 @@ jobs:
         run: |
           set -euo pipefail
           export DSH_HOME="$RUNNER_TEMP/daw-runtime-home"
-          (cd deepseek-harness && pnpm dsh plugin --profile web add "$GITHUB_WORKSPACE/artifacts/dsh-workspace-1.0.0.tgz")
-          (cd deepseek-harness && node --import tsx/esm apps/cli/src/bin.ts web --port 43992) &
+          plugin_tgz="$GITHUB_WORKSPACE/artifacts/dsh-workspace-$(node -p "require('./package.json').version").tgz"
+          (cd deepseek-harness && pnpm dsh plugin --profile web add "$plugin_tgz")
+          (cd deepseek-harness && node --import tsx/esm apps/cli/src/bin.ts web --port 43992 --no-open) &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
           for attempt in $(seq 1 120); do
-            if curl --fail --silent http://127.0.0.1:43992/ >/dev/null \
+            web_code="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:43992/ || true)"
+            if echo "$web_code" | grep -Eq '^(200|30[0-9]|401)$' \
               && curl --fail --silent http://127.0.0.1:3090/api/v1/healthz >/dev/null; then
               exit 0
             fi
