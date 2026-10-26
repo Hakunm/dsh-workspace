@@ -40,7 +40,7 @@
 使用运行 DSH WebUI 的同一系统用户执行：
 
 ```sh
-dsh plugin --profile web add https://github.com/Hakunm/dsh-workspace/releases/download/v1.0.0/dsh-workspace-1.0.0.tgz
+dsh plugin --profile web add https://github.com/Hakunm/dsh-workspace/releases/download/v1.1.0/dsh-workspace-1.1.0.tgz
 npx @deepseek-ai/dsh web
 ```
 
@@ -49,7 +49,7 @@ npx @deepseek-ai/dsh web
 从 GitHub Release 下载离线安装包时，可直接安装 tarball：
 
 ```sh
-dsh plugin --profile web add ./dsh-workspace-1.0.0.tgz
+dsh plugin --profile web add ./dsh-workspace-1.1.0.tgz
 ```
 
 ## 第一次使用

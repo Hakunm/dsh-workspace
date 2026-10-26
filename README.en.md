@@ -40,7 +40,7 @@ Remote access remains disabled until a local administrator chooses a bind addres
 Run as the same operating-system user that runs DSH WebUI:
 
 ```sh
-dsh plugin --profile web add https://github.com/Hakunm/dsh-workspace/releases/download/v1.0.0/dsh-workspace-1.0.0.tgz
+dsh plugin --profile web add https://github.com/Hakunm/dsh-workspace/releases/download/v1.1.0/dsh-workspace-1.1.0.tgz
 npx @deepseek-ai/dsh web
 ```
 
@@ -49,7 +49,7 @@ Restart WebUI after installation. A **Files** entry appears in the sidebar, and 
 To install a downloaded release archive:
 
 ```sh
-dsh plugin --profile web add ./dsh-workspace-1.0.0.tgz
+dsh plugin --profile web add ./dsh-workspace-1.1.0.tgz
 ```
 
 ## First connection
