@@ -217,7 +217,7 @@ v1.1.0 基于 DSH `dsh-v0.2.1-rc.3`（npm `@deepseek-ai/dsh@0.2.1-rc.3`）开发
 
 ## 项目信息
 
-- 当前版本：`v1.0.0`
+- 当前版本：`v1.1.0`
 - 作者：[Github@Hakunm](https://github.com/Hakunm)
 - 许可证：[GNU Affero General Public License v3.0](./LICENSE)
 - Android 客户端：[dsh-android-app](https://github.com/Hakunm/dsh-android-app)
