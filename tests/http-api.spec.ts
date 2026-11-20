@@ -192,8 +192,26 @@ describe('remote HTTP API', () => {
     try {
       await remote.start()
       const baseUrl = `http://127.0.0.1:${remote.status().port}/api/v1`
-      const health = await (await fetch(`${baseUrl}/healthz`)).json() as { pluginVersion: string }
-      expect(health.pluginVersion).toBe('1.1.0')
+      const health = await (await fetch(`${baseUrl}/healthz`)).json() as { pluginVersion: string; capabilities: string[] }
+      expect(health.pluginVersion).toBe('1.2.0')
+      expect(health.capabilities).toEqual(expect.arrayContaining([
+        'streaming',
+        'permissions',
+        'questions',
+        'pin',
+        'unarchive',
+        'search',
+        'file-search',
+        'queue',
+        'image-attachments',
+      ]))
+
+      const perms = await fetch(`${baseUrl}/chat/permissions`, { headers })
+      expect(perms.status).toBe(200)
+      await expect(perms.json()).resolves.toMatchObject({
+        defaultPreset: 'workspace-write',
+        options: [{ value: 'workspace-write', name: 'Workspace write' }],
+      })
 
       expect((await fetch(`${baseUrl}/chat/workspaces/workspace-1`, {
         method: 'PATCH', headers, body: JSON.stringify({ title: 'Renamed workspace' }),
@@ -206,11 +224,66 @@ describe('remote HTTP API', () => {
       })
       expect(fork.status).toBe(201)
       await expect(fork.json()).resolves.toEqual({ sessionId: 'session-forked' })
+      expect((await fetch(`${baseUrl}/chat/sessions/session-1/pin`, {
+        method: 'POST', headers, body: '{}',
+      })).status).toBe(200)
+      expect((await fetch(`${baseUrl}/chat/sessions/session-1/pin`, {
+        method: 'DELETE', headers,
+      })).status).toBe(200)
       expect((await fetch(`${baseUrl}/chat/sessions/session-1/archive`, {
         method: 'POST', headers, body: '{}',
       })).status).toBe(200)
+      const withArchived = await (await fetch(`${baseUrl}/chat/sessions?includeArchived=true`, { headers })).json() as {
+        items: { id: string; archived?: boolean }[]
+      }
+      expect(withArchived.items.find(item => item.id === 'session-1')?.archived).toBe(true)
+      expect((await fetch(`${baseUrl}/chat/sessions/session-1/unarchive`, {
+        method: 'POST', headers, body: '{}',
+      })).status).toBe(200)
+
+      const searched = await fetch(`${baseUrl}/chat/sessions/search?q=session`, { headers })
+      expect(searched.status).toBe(200)
+      await expect(searched.json()).resolves.toMatchObject({
+        mode: 'fulltext',
+        items: [expect.objectContaining({ sessionId: 'session-1' })],
+      })
+
+      const state = await fetch(`${baseUrl}/chat/sessions/session-1/state`, { headers })
+      expect(state.status).toBe(200)
+      await expect(state.json()).resolves.toMatchObject({ cursor: 5, active: true, running: false })
+
+      expect((await fetch(`${baseUrl}/chat/sessions/session-1/queue/q-1`, {
+        method: 'POST', headers, body: JSON.stringify({ kind: 'edit', text: 'updated' }),
+      })).status).toBe(200)
+      expect((await fetch(`${baseUrl}/chat/sessions/session-1/queue/q-1`, {
+        method: 'POST', headers, body: JSON.stringify({ kind: 'invalid' }),
+      })).status).toBe(400)
+
+      const msgWithImage = await fetch(`${baseUrl}/chat/sessions/session-1/messages`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          text: 'Describe image',
+          attachments: [{ type: 'image', mediaType: 'image/png', data: 'AQID', name: 'shot.png' }],
+        }),
+      })
+      expect(msgWithImage.status).toBe(202)
+
       expect((await fetch(`${baseUrl}/chat/workspaces/workspace-1`, { method: 'DELETE', headers })).status).toBe(200)
-      expect(calls.map(call => call.name)).toEqual(['workspace.rename', 'session.rename', 'session.fork', 'session.archive', 'workspace.delete'])
+      expect(calls.map(call => call.name)).toEqual([
+        'workspace.rename',
+        'session.rename',
+        'session.fork',
+        'session.pin',
+        'session.unpin',
+        'session.archive',
+        'session.unarchive',
+        'session.search',
+        'session.state',
+        'session.updateQueue',
+        'session.prompt',
+        'workspace.delete',
+      ])
     } finally {
       await remote.stop()
       database.close()
@@ -222,6 +295,7 @@ function managementApi(projectPath: string, calls: { name: string; payload: Reco
   const ok = <T>(value: T) => ({ result: { ok: true as const, value } })
   let forked = false
   let archived: string[] = []
+  let pinned: string[] = []
   let workspaceTitle = 'Project'
   let workspaceDeleted = false
   const workspace = () => ({
@@ -229,6 +303,12 @@ function managementApi(projectPath: string, calls: { name: string; payload: Reco
     createdAt: '2026-08-15T00:00:00.000Z', updatedAt: '2026-08-15T00:00:00.000Z',
   })
   return {
+    permissions: {
+      catalog: async () => ok({
+        defaultPreset: 'workspace-write',
+        options: [{ value: 'workspace-write', name: 'Workspace write' }],
+      }),
+    },
     sessions: {
       list: async () => ok({ items: [
         { sessionId: 'session-1', updatedAt: 1, running: false, blank: false, cwd: projectPath },
@@ -243,9 +323,25 @@ function managementApi(projectPath: string, calls: { name: string; payload: Reco
         forked = true
         return ok({ sessionId: 'session-forked' })
       },
+      search: async (request: { payload: Record<string, unknown> }) => {
+        calls.push({ name: 'session.search', payload: request.payload })
+        return ok({ items: [{ sessionId: 'session-1', snippet: 'matched session snippet' }], hasMore: false, supported: true })
+      },
+      state: async (request: { payload: Record<string, unknown> }) => {
+        calls.push({ name: 'session.state', payload: request.payload })
+        return ok({ cursor: 5, active: true, running: false, queue: [], pendingInput: [] })
+      },
+      updateQueue: async (request: { payload: Record<string, unknown> }) => {
+        calls.push({ name: 'session.updateQueue', payload: request.payload })
+        return ok({ accepted: true as const })
+      },
+      prompt: async (request: { payload: Record<string, unknown> }) => {
+        calls.push({ name: 'session.prompt', payload: request.payload })
+        return ok({ accepted: true as const })
+      },
     },
     workspace: {
-      list: async () => ok({ items: workspaceDeleted ? [] : [workspace()], archivedSessionIds: archived }),
+      list: async () => ok({ items: workspaceDeleted ? [] : [workspace()], archivedSessionIds: archived, pinnedSessionIds: pinned }),
       rename: async (request: { payload: Record<string, unknown> }) => {
         calls.push({ name: 'workspace.rename', payload: request.payload })
         workspaceTitle = request.payload.title as string
@@ -260,6 +356,21 @@ function managementApi(projectPath: string, calls: { name: string; payload: Reco
         calls.push({ name: 'session.archive', payload: request.payload })
         archived = [request.payload.sessionId as string]
         return ok({ archivedSessionIds: archived })
+      },
+      unarchiveSession: async (request: { payload: Record<string, unknown> }) => {
+        calls.push({ name: 'session.unarchive', payload: request.payload })
+        archived = archived.filter(id => id !== request.payload.sessionId)
+        return ok({ archivedSessionIds: archived })
+      },
+      pinSession: async (request: { payload: Record<string, unknown> }) => {
+        calls.push({ name: 'session.pin', payload: request.payload })
+        pinned = [request.payload.sessionId as string]
+        return ok({ pinnedSessionIds: pinned })
+      },
+      unpinSession: async (request: { payload: Record<string, unknown> }) => {
+        calls.push({ name: 'session.unpin', payload: request.payload })
+        pinned = pinned.filter(id => id !== request.payload.sessionId)
+        return ok({ pinnedSessionIds: pinned })
       },
     },
   }

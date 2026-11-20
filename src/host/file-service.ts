@@ -29,6 +29,13 @@ export interface DirectoryPage {
   nextCursor?: string
 }
 
+export interface SearchFilesResult {
+  query: string
+  path: string
+  entries: FileEntryView[]
+  truncated: boolean
+}
+
 export interface ContentDescriptor {
   absolutePath: string
   size: number
@@ -83,6 +90,79 @@ export class FileService {
       entries,
       ...(start + selected.length < names.length && last !== undefined ? { nextCursor: encodeCursor(last) } : {}),
     }
+  }
+
+  async search(
+    root: StoredRoot,
+    query: string,
+    options: { relativePath?: string; limit?: number; includeHidden?: boolean } = {},
+  ): Promise<SearchFilesResult> {
+    const normalized = query.trim()
+    if (normalized === '' || normalized.length > 200 || normalized.includes('\0')) {
+      throw new ApiError(400, 'SEARCH_QUERY_INVALID', 'Search query must contain 1 to 200 characters and no null bytes.')
+    }
+    const baseRelative = options.relativePath ?? ''
+    const resolved = await resolveAuthorizedPath(root.realPath, baseRelative)
+    const startInfo = await lstat(resolved.absolutePath)
+    if (!startInfo.isDirectory() || startInfo.isSymbolicLink()) {
+      throw new ApiError(400, 'PATH_NOT_DIRECTORY', 'The requested search path is not a directory.')
+    }
+    const limit = Math.min(Math.max(options.limit ?? 50, 1), 200)
+    const maxVisited = 5_000
+    const needle = normalized.toLowerCase()
+    const skipDirs = new Set(['.git', 'node_modules', '.gradle', '.idea', '__pycache__'])
+    const entries: FileEntryView[] = []
+    let visited = 0
+    let truncated = false
+
+    const queue: Array<{ absolute: string; relative: string }> = [{ absolute: resolved.absolutePath, relative: baseRelative }]
+    while (queue.length > 0 && entries.length < limit) {
+      const current = queue.shift() as { absolute: string; relative: string }
+      let names: string[]
+      try {
+        names = await readdir(current.absolute)
+      } catch {
+        continue
+      }
+      names.sort((left, right) => left.localeCompare(right))
+      for (const name of names) {
+        visited += 1
+        if (visited > maxVisited) {
+          truncated = true
+          break
+        }
+        if (!options.includeHidden && (name.startsWith('.') || skipDirs.has(name))) continue
+        const childAbsolute = path.join(current.absolute, name)
+        const childRelative = current.relative === '' ? name : `${current.relative}/${name}`
+        let info: Awaited<ReturnType<typeof lstat>>
+        try {
+          info = await lstat(childAbsolute)
+        } catch {
+          continue
+        }
+        const kind = kindOf(info)
+        if (name.toLowerCase().includes(needle) || childRelative.toLowerCase().includes(needle)) {
+          entries.push({
+            name,
+            path: childRelative,
+            kind,
+            size: info.isFile() ? info.size : 0,
+            modifiedAt: info.mtimeMs,
+            writable: (info.mode & 0o200) !== 0,
+          })
+          if (entries.length >= limit) {
+            truncated = true
+            break
+          }
+        }
+        // Never traverse through symlinks or junctions during recursive search.
+        if (kind === 'directory') {
+          queue.push({ absolute: childAbsolute, relative: childRelative })
+        }
+      }
+      if (truncated) break
+    }
+    return { query: normalized, path: baseRelative, entries, truncated }
   }
 
   async inspectContent(root: StoredRoot, relativePath: string): Promise<ContentDescriptor> {

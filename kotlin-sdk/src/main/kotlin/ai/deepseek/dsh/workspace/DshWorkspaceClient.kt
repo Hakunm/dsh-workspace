@@ -22,7 +22,12 @@ import okhttp3.WebSocketListener
 const val API_VERSION: String = "v1"
 
 @Serializable
-data class HealthView(val ok: Boolean, val version: String, val pluginVersion: String? = null)
+data class HealthView(
+    val ok: Boolean,
+    val version: String,
+    val pluginVersion: String? = null,
+    val capabilities: List<String> = emptyList(),
+)
 
 @Serializable
 data class RootView(val id: String, val label: String, val createdAt: Long)
@@ -39,6 +44,14 @@ data class FileEntry(
 
 @Serializable
 data class DirectoryPage(val path: String, val entries: List<FileEntry>, val nextCursor: String? = null)
+
+@Serializable
+data class FileSearchResult(
+    val query: String,
+    val path: String,
+    val entries: List<FileEntry>,
+    val truncated: Boolean = false,
+)
 
 @Serializable
 data class DeviceView(
@@ -108,9 +121,81 @@ data class AgentPreset(
     val id: String,
     val name: String,
     val description: String? = null,
-    val trust: String,
-    val isDefault: Boolean,
-    val available: Boolean,
+    val trust: String = "system",
+    val isDefault: Boolean = false,
+    val available: Boolean = true,
+)
+
+@Serializable
+data class PermissionOption(
+    val value: String,
+    val name: String,
+    val description: String? = null,
+)
+
+@Serializable
+data class PermissionCatalog(
+    val options: List<PermissionOption>,
+    val defaultPreset: String,
+)
+
+@Serializable
+data class QuestionOption(
+    val label: String,
+    val description: String? = null,
+)
+
+@Serializable
+data class QuestionItem(
+    val id: String,
+    val question: String,
+    val detail: String? = null,
+    val header: String? = null,
+    val options: List<QuestionOption>? = null,
+    val multiSelect: Boolean = false,
+)
+
+@Serializable
+data class PendingQuestion(
+    val id: String,
+    val sessionId: String,
+    val callId: String? = null,
+    val state: String,
+    val timed: Boolean = false,
+    val questions: List<QuestionItem>,
+    val requestedAt: Long,
+)
+
+@Serializable
+data class QuestionAnswerItem(
+    val id: String,
+    val selected: List<String>,
+    val custom: String? = null,
+)
+
+@Serializable
+data class ImageAttachment(
+    val type: String = "image",
+    val mediaType: String,
+    val data: String,
+    val name: String? = null,
+)
+
+@Serializable
+data class SessionQueuedItem(
+    val id: String,
+    val placement: String,
+    val rpcId: String? = null,
+    val content: List<JsonElement> = emptyList(),
+)
+
+@Serializable
+data class SessionState(
+    val cursor: Int,
+    val active: Boolean,
+    val running: Boolean,
+    val queue: List<SessionQueuedItem>? = null,
+    val pendingInput: List<String> = emptyList(),
 )
 
 @Serializable
@@ -191,6 +276,8 @@ data class ProviderView(
     val configurable: Boolean,
     val configured: Boolean,
     val removable: Boolean,
+    val defaultBaseURL: String? = null,
+    val error: String? = null,
     val credential: CredentialState,
     val config: ProviderConfig,
 )
@@ -276,6 +363,24 @@ class DshWorkspaceClient(
         return executeJson(url, "GET", null, DirectoryPage.serializer())
     }
 
+    fun searchFiles(
+        rootId: String,
+        query: String,
+        path: String = "",
+        limit: Int = 100,
+        includeHidden: Boolean = false,
+    ): FileSearchResult {
+        val url = endpoint("roots/$rootId/search").newBuilder()
+            .addQueryParameter("query", query)
+            .addQueryParameter("limit", limit.toString())
+            .apply {
+                if (path.isNotEmpty()) addQueryParameter("path", path)
+                if (includeHidden) addQueryParameter("includeHidden", "true")
+            }
+            .build()
+        return executeJson(url, "GET", null, FileSearchResult.serializer())
+    }
+
     fun readFile(rootId: String, path: String, range: LongRange? = null): FileContent {
         val url = endpoint("roots/$rootId/content").newBuilder().addQueryParameter("path", path).build()
         val builder = request(url)
@@ -327,7 +432,35 @@ class DshWorkspaceClient(
         executeUnit("trash/$trashId/restore", "POST", null)
     }
 
-    fun listSessions(): JsonElement = executeJsonElement("chat/sessions", "GET", null)
+    fun listSessions(includeArchived: Boolean = false): JsonElement {
+        val url = endpoint("chat/sessions").newBuilder()
+            .apply { if (includeArchived) addQueryParameter("includeArchived", "true") }
+            .build()
+        val response = execute(url, "GET", null, true)
+        response.use {
+            ensureSuccess(it)
+            return json.parseToJsonElement(it.body?.string() ?: "{}")
+        }
+    }
+
+    fun searchSessions(query: String, includeArchived: Boolean = false): JsonElement {
+        val url = endpoint("chat/sessions/search").newBuilder()
+            .addQueryParameter("q", query)
+            .apply { if (includeArchived) addQueryParameter("includeArchived", "true") }
+            .build()
+        val response = execute(url, "GET", null, true)
+        response.use {
+            ensureSuccess(it)
+            return json.parseToJsonElement(it.body?.string() ?: "{}")
+        }
+    }
+
+    fun listPermissionCatalog(): PermissionCatalog = executeJson(
+        "chat/permissions",
+        "GET",
+        null,
+        PermissionCatalog.serializer(),
+    )
 
     fun listChatWorkspaces(): List<ChatWorkspace> = executeJson(
         "chat/workspaces",
@@ -477,6 +610,42 @@ class DshWorkspaceClient(
         executeUnit("chat/sessions/$sessionId/archive", "POST", null)
     }
 
+    fun unarchiveSession(sessionId: String) {
+        executeUnit("chat/sessions/$sessionId/unarchive", "POST", null)
+    }
+
+    fun pinSession(sessionId: String) {
+        executeUnit("chat/sessions/$sessionId/pin", "POST", null)
+    }
+
+    fun unpinSession(sessionId: String) {
+        executeUnit("chat/sessions/$sessionId/pin", "DELETE", null)
+    }
+
+    fun getSessionState(sessionId: String): SessionState = executeJson(
+        "chat/sessions/$sessionId/state",
+        "GET",
+        null,
+        SessionState.serializer(),
+    )
+
+    fun updateQueue(sessionId: String, itemId: String, kind: String, text: String? = null) {
+        val body = json.encodeToString(QueueMutationRequest.serializer(), QueueMutationRequest(kind, text))
+        executeUnit("chat/sessions/$sessionId/queue/$itemId", "POST", body)
+    }
+
+    fun listPendingQuestions(sessionId: String): List<PendingQuestion> = executeJson(
+        "chat/sessions/$sessionId/questions",
+        "GET",
+        null,
+        PendingQuestionList.serializer(),
+    ).items
+
+    fun answerQuestion(sessionId: String, questionId: String, answers: List<QuestionAnswerItem>) {
+        val body = json.encodeToString(QuestionAnswerRequest.serializer(), QuestionAnswerRequest(answers))
+        executeUnit("chat/sessions/$sessionId/questions/$questionId/answer", "POST", body)
+    }
+
     fun listPendingApprovals(sessionId: String): List<PendingApproval> = executeJson(
         "chat/sessions/$sessionId/approvals",
         "GET",
@@ -509,10 +678,21 @@ class DshWorkspaceClient(
         ).execution
     }
 
-    fun sendMessage(sessionId: String, text: String, clientRequestId: String, steer: Boolean = false): JsonElement {
+    fun sendMessage(
+        sessionId: String,
+        text: String,
+        clientRequestId: String,
+        steer: Boolean = false,
+        attachments: List<ImageAttachment> = emptyList(),
+    ): JsonElement {
         val body = json.encodeToString(
             SendMessageRequest.serializer(),
-            SendMessageRequest(text, if (steer) "steer" else "queue", clientRequestId),
+            SendMessageRequest(
+                text = text,
+                mode = if (steer) "steer" else "queue",
+                clientRequestId = clientRequestId,
+                attachments = attachments.ifEmpty { null },
+            ),
         )
         return executeJsonElement("chat/sessions/$sessionId/messages", "POST", body)
     }
@@ -686,6 +866,14 @@ class EventSubscription internal constructor(
     val agentPreset: String? = null,
     val clientRequestId: String,
 )
-@Serializable private data class SendMessageRequest(val text: String, val mode: String, val clientRequestId: String)
+@Serializable private data class PendingQuestionList(val items: List<PendingQuestion>)
+@Serializable private data class QuestionAnswerRequest(val answers: List<QuestionAnswerItem>)
+@Serializable private data class QueueMutationRequest(val kind: String, val text: String? = null)
+@Serializable private data class SendMessageRequest(
+    val text: String,
+    val mode: String,
+    val clientRequestId: String,
+    val attachments: List<ImageAttachment>? = null,
+)
 @Serializable private data class ErrorEnvelope(val error: ApiErrorBody)
 @Serializable private data class ApiErrorBody(val code: String, val message: String, val requestId: String)

@@ -61,7 +61,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: deepseek-ai/deepseek-harness
-          ref: dsh-v0.2.1-rc.3
+          ref: dsh-v0.2.2-rc.5
           path: deepseek-harness
       - working-directory: deepseek-harness
         run: pnpm install --frozen-lockfile
@@ -82,7 +82,7 @@ jobs:
           for attempt in $(seq 1 120); do
             web_code="$(curl --silent --output /dev/null --write-out '%{http_code}' http://127.0.0.1:43992/ || true)"
             if echo "$web_code" | grep -Eq '^(200|30[0-9]|401)$' \
-              && curl --fail --silent http://127.0.0.1:3090/api/v1/healthz >/dev/null; then
+              && curl --fail --silent http://127.0.0.1:3090/api/v1/healthz | grep -q '"pluginVersion"'; then
               exit 0
             fi
             sleep 1

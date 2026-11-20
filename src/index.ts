@@ -36,8 +36,9 @@ interface HostContext extends HostDshServices {
   agents: NonNullable<ConstructorParameters<typeof DshChatAdapter>[2]>['agents']
   commands: NonNullable<ConstructorParameters<typeof DshChatAdapter>[2]>['commands']
   logger: { info(message: string): void; warn(error: Error): void }
-  effect(register: () => (() => void | Promise<void>), label?: string): void
-  on(event: string, handler: (...args: unknown[]) => unknown, options?: { global?: boolean }): () => void
+  effect(register: () => (() => void | Promise<void>) | void, label?: string): void
+  on(event: string, handler: (...args: unknown[]) => unknown, options?: { global?: boolean; prepend?: boolean }): () => void
+  get?<T = unknown>(name: string): T | undefined
 }
 
 export async function apply(ctx: HostContext, config: Config = {}): Promise<void> {

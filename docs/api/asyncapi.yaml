@@ -1,7 +1,7 @@
 asyncapi: 3.0.0
 info:
   title: DeepSeek Harness Mobile Events
-  version: 1.1.0
+  version: 1.2.0
   description: Live file and authorized DSH chat events. Reconnect clients must refresh REST state; unbounded replay is not provided.
 servers:
   local:
@@ -32,7 +32,7 @@ components:
           id: { type: string }
           type:
             type: string
-            examples: [file.changed, file.trashed, chat.message.delta, chat.message.committed, chat.session.status, chat.approval.requested, chat.approval.resolved, connection.ready]
+            examples: [file.changed, file.trashed, chat.message.delta, chat.message.committed, chat.session.status, chat.approval.requested, chat.approval.resolved, chat.question.requested, chat.question.resolved, connection.ready]
           time: { type: integer }
           data:
             oneOf:
@@ -40,6 +40,8 @@ components:
               - $ref: '#/components/schemas/ChatMessageCommitted'
               - $ref: '#/components/schemas/ChatApprovalRequested'
               - $ref: '#/components/schemas/ChatApprovalResolved'
+              - $ref: '#/components/schemas/ChatQuestionRequested'
+              - $ref: '#/components/schemas/ChatQuestionResolved'
               - type: object
                 additionalProperties: true
   schemas:
@@ -84,3 +86,20 @@ components:
         sessionId: { type: string }
         approvalId: { type: string }
         outcome: { type: string, enum: [allowed-once, rejected, cancelled, unavailable] }
+    ChatQuestionRequested:
+      type: object
+      description: Signals that DSH asked the user structured question(s) and clients should refresh pending questions.
+      required: [sessionId, questionId, questionCount, timed]
+      properties:
+        sessionId: { type: string }
+        questionId: { type: string }
+        questionCount: { type: integer, minimum: 1 }
+        timed: { type: boolean }
+    ChatQuestionResolved:
+      type: object
+      description: Signals that a pending user-question prompt was answered, continued, or cancelled.
+      required: [sessionId, questionId]
+      properties:
+        sessionId: { type: string }
+        questionId: { type: string }
+        outcome: { type: string, enum: [answered, continued, cancelled, unavailable] }

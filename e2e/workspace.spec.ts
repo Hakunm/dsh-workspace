@@ -18,6 +18,13 @@ test('loads, edits, saves, and opens local management', async ({ page }, testInf
   await expect(page.getByRole('dialog', { name: '工作区设置' })).toBeVisible()
   await expect(page.getByText('E2E project').last()).toBeVisible()
   await page.screenshot({ path: testInfo.outputPath('workspace.png'), fullPage: true })
+  await page.getByTitle('关闭').click()
+
+  const search = page.getByPlaceholder('搜索文件名…')
+  await search.fill('sample')
+  await expect(page.locator('.daw-search-row')).toHaveCount(1)
+  await page.locator('.daw-search-row').first().click()
+  await expect(page.locator('.daw-filepath')).toHaveText('src/sample.ts')
 })
 
 test('switches to English and persists the preference', async ({ page }) => {

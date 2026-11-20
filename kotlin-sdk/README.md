@@ -1,6 +1,6 @@
 # Kotlin SDK
 
-该模块是 DeepSeek Harness Android App 的版本化网络层，支持 HTTP/HTTPS、Bearer token、文件与聊天 REST、工作区/会话管理、TODO/权限投影、DSH host 斜杠命令、供应商/凭据状态、模型发现、会话模型/思考强度选择，以及自动退避重连的 WebSocket。App 位于独立项目 `dsh-android-app`；DSH WebUI 功能对等按插件 API 能力矩阵推进，不直接调用 DSH 私有 wire。
+该模块是 DeepSeek Harness Android App 的版本化网络层，支持 HTTP/HTTPS、Bearer token、文件浏览/递归搜索与编辑 REST、聊天工作区/会话管理（含置顶、取消归档与全文检索）、TODO/权限预设目录、DSH host 斜杠命令、审批与结构化提问、排队消息操作、图片附件、供应商/凭据状态、模型发现、会话模型/思考强度选择，以及自动退避重连的 WebSocket。App 位于独立项目 `dsh-android-app`；DSH WebUI 功能对等按插件 API 能力矩阵推进，不直接调用 DSH 私有 wire。
 
 ```kotlin
 val client = DshWorkspaceClient(

@@ -107,6 +107,11 @@ const zh = {
   errorRateLimited: '请求过于频繁，请稍后重试。',
   author: '作者 Github@Hakunm',
   version: '当前版本',
+  searchFiles: '搜索文件名…',
+  clearSearch: '清空搜索',
+  searching: '正在搜索…',
+  noSearchResults: '未找到匹配的文件或目录',
+  searchTruncated: '仅显示前 {count} 条匹配结果',
 } as const
 
 export type MessageKey = keyof typeof zh
@@ -214,6 +219,11 @@ const en: Messages = {
   errorRateLimited: 'Too many requests. Try again shortly.',
   author: 'Author Github@Hakunm',
   version: 'Current version',
+  searchFiles: 'Search files…',
+  clearSearch: 'Clear search',
+  searching: 'Searching…',
+  noSearchResults: 'No matching files or folders',
+  searchTruncated: 'Showing first {count} matches',
 }
 
 const dictionaries: Record<WorkspaceLocale, Messages> = { 'zh-CN': zh, en }

@@ -39,3 +39,4 @@
 | REL-003 | done | BRAND-002,LICENSE-001,DOC-002 | 重新打包 v1.0.0，以单一根提交重写公开 `main` 与 `v1.0.0` 标签，并替换 Release 校验和与产物 |
 | REL-004 | done | DOC-003,REL-003 | README 刷新后继续以单一根提交重写公开 `main` 与 `v1.0.0` 标签，不保留中间修改历史 |
 | DSH-002 | done | REL-004 | v1.1.0 适配 DSH `dsh-v0.2.1-rc.3`：Host 注入 session/workspace/settings controller 桥接层、审批 waterfall、profile 安装与 `pnpm check` 通过 |
+| DSH-003 | done | DSH-002 | v1.2.0 全面适配 DSH `dsh-v0.2.2-rc.5`：修复超时信号/EventHub 丢帧/`throughSeq`/流式订阅/4 参斜杠命令/WebUI `@deepseek-ai/dsh-client-ui-renderer` 与 provider/凭据分批等缺陷；补齐文件搜索、深色模式、`Ctrl+S`、置顶/取消归档/会话搜索、权限目录、队列编辑、用户提问与图片附件，并通过真实 DSH 端到端验收与 Release 发布 |

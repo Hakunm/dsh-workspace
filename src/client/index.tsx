@@ -20,7 +20,7 @@ const api = new WorkspaceApi('/dsh-workspace-api/api/v1', '/dsh-workspace-api/ma
 export const inject = ['slots']
 
 export function apply(ctx: ClientContext): void {
-  installWorkspaceStyles()
+  ctx.effect(() => installWorkspaceStyles(), 'dsh workspace styles')
   ctx.effect(() => localizedSlot(ctx, 'conversation.view', {
     name: 'conversation.view', id: 'dsh-workspace-files', order: 80,
   }, FileConversationView), 'dsh workspace conversation view')

@@ -43,7 +43,7 @@ curl "http://192.168.1.20:3090/api/v1/roots/ROOT_ID/entries?path=src" \
 
 `PATCH /chat/workspaces/{workspaceId}` 重命名可见工作区，`DELETE` 只移除 DSH 工作区登记，不删除目录、文件或会话日志。两者都要求 `chat.write`，并在调用宿主前重新验证工作区仍位于设备授权根内。
 
-`PATCH /chat/sessions/{sessionId}` 重命名会话；`POST .../fork` 在 DSH 完成的事件边界分叉并继承历史、工作目录和配置；`POST .../archive` 把会话加入 DSH 归档集合。归档会话从默认 `GET /chat/sessions` 结果中隐藏，但日志保留。所有操作同时执行 `chat.write` 与 session/root 授权检查。
+`PATCH /chat/sessions/{sessionId}` 重命名会话；`POST .../fork` 在 DSH 完成的事件边界分叉并继承历史、工作目录和配置；`POST .../archive` 与 `POST .../unarchive` 控制会话归档与恢复（`GET /chat/sessions?includeArchived=true` 可包含已归档项）；`POST .../pin` 与 `DELETE .../pin` 置顶或取消置顶；`GET /chat/sessions/search?q=...` 优先调用 DSH 全文检索并在不可用时回退至元数据检索；`GET /chat/permissions` 返回权限预设目录；`GET /chat/sessions/{sessionId}/state` 与 `POST .../queue/{itemId}` 支持查询与编辑/移除/引导排队消息；`GET .../questions` 与 `POST .../questions/{questionId}/answer` 支持回答 DSH 结构化提问；`POST .../messages` 支持可选 `attachments` 图片附件；`GET /roots/{rootId}/search` 支持授权根内安全递归文件搜索。所有操作同时执行对应 scope 与 session/root 授权检查。
 
 ## 模型与供应商
 
@@ -87,6 +87,6 @@ DSH 的 `assistant/chunk` 不直接泄漏为私有 wire。插件将文本和思�
 
 ## Android 功能对等矩阵
 
-当前 `v1` 已覆盖设备配对、授权根、文件管理、回收站、工作区发现/创建/重命名/移除、会话列表/创建/重命名/分叉/归档、历史、发消息、steer、取消、实时事件、Agent Preset、TODO/权限投影、当前会话 host 斜杠命令、待审批查询与允许一次/拒绝、供应商有效配置/凭据状态、自定义供应商、模型发现以及会话模型/推理等级选择。以下 DSH WebUI 能力尚未进入稳定外部契约：会话搜索、附件与队列、通用问题回答、工作区自定义排序、归档恢复、目标、子代理、技能和后台任务。
+当前 `v1`（插件 `v1.2.0`）已覆盖设备配对、授权根、文件管理与递归搜索、回收站、工作区发现/创建/重命名/移除、会话列表（含归档视图）/搜索/创建/重命名/分叉/置顶/归档/恢复归档、历史、发消息与图片附件、排队消息管理（编辑/移除/steer）、取消、实时流式事件、Agent Preset、TODO/权限预设目录、当前会话 host 斜杠命令、待审批查询与允许一次/拒绝（与 WebUI 并行竞态）、DSH 结构化用户提问、供应商有效配置/凭据状态、自定义供应商、模型发现以及会话模型/推理等级选择。以下 DSH WebUI 能力尚未进入稳定外部契约：工作区自定义排序、目标、子代理、技能和后台任务。
 
 App 不得直接调用 DSH 私有 `/api` 或通用 RPC 透传。每项缺失能力必须在插件中定义稳定 REST/事件 schema、对应设备 scope/root/session 授权、脱敏规则、OpenAPI/AsyncAPI、Kotlin SDK 和合约测试后才能标记为对等。

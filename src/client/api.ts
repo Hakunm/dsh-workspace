@@ -6,6 +6,13 @@ export interface DirectoryPage {
   nextCursor?: string
 }
 
+export interface SearchFilesResult {
+  query: string
+  path: string
+  entries: FileEntryView[]
+  truncated: boolean
+}
+
 export interface ContentResult {
   bytes: Uint8Array
   etag: string
@@ -37,6 +44,12 @@ export class WorkspaceApi {
 
   async list(rootId: string, relativePath: string): Promise<DirectoryPage> {
     return this.json<DirectoryPage>(`/roots/${encodeURIComponent(rootId)}/entries?path=${encodeURIComponent(relativePath)}`)
+  }
+
+  async searchFiles(rootId: string, query: string, relativePath = '', limit = 100): Promise<SearchFilesResult> {
+    const params = new URLSearchParams({ query, limit: String(limit) })
+    if (relativePath !== '') params.set('path', relativePath)
+    return this.json<SearchFilesResult>(`/roots/${encodeURIComponent(rootId)}/search?${params.toString()}`)
   }
 
   async read(rootId: string, relativePath: string): Promise<ContentResult> {

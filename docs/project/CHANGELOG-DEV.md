@@ -1,5 +1,20 @@
 # 开发日志
 
+## 2026-11-20 · v1.2.0
+
+- 完成 `DSH-003`：全面适配 DeepSeek Harness `dsh-v0.2.2-rc.5`（npm `@deepseek-ai/dsh@0.2.2-rc.5`）并修复 v1.1.0 遗留的多个严重运行时缺陷：
+  - 修复模块级 `HOST_SIGNAL` 2 分钟永久超时失效问题（改为按请求创建独立 `AbortSignal.timeout`）。
+  - 重写 `createEventHub` 为多订阅者独立有界扇出队列并在 `ctx.effect` 清理，修复等待消费时丢帧及无订阅者内存增长。
+  - 修复 `sessions.history` 传递 `throughSeq: -1` 导致 DSH 0.2.2 返回空历史的问题，改为省略 `throughSeq` 并调用 `sessionController.events`，同时从 `permissionPresets.catalog()` 回填权限选项。
+  - 补全 `agent/assistant-stream`（`start`/`chunk`/`end`）订阅，恢复文本与思考 token 实时流式推送。
+  - 修复 `commands.execute` 缺少第 3 参数附件数组 `[]` 导致斜杠命令返回 409 的问题。
+  - 修复 `approval/request` 拦截阻塞 WebUI 审批的问题：以 `{ prepend: true }` 与 `next()` 并行竞态；同步支持 DSH 0.2.2 `user-questions/request` 及 `continued` 状态回填。
+  - 修复 `dsh.client.inject` 引用已删除的 `@deepseek-ai/dsh-client-runtime` 导致 WebUI 插件无法加载的问题，切换为 `@deepseek-ai/dsh-client-ui-renderer` 并对齐 `tsdown.config.ts` `clientExternals`。
+  - 修复 `llm.listConfigurableProviders()` 移除 `.active` 字段（合并 `listProviders()` 并保留 `deepseek-account`）、`credentials.describe` 按 64 个 ref 分批、`modelSelection` `{ lastUsed, next }` 投影结构、过滤 `origin === 'subagent'` 及兼容 `session/title` 字符串/对象格式。
+- 新增并补全功能：授权根安全递归文件搜索（`GET /roots/{id}/search`，兼容 `?q` 与 `?query`）、WebUI 文件树防抖搜索框、`Ctrl/Cmd+S` 保存并保留光标与撤销栈、跟随 DSH `body[data-ds-dark-theme]` 深色主题与样式卸载清理、权限预设目录（`GET /chat/permissions`）、会话搜索（`GET /chat/sessions/search`）、会话置顶/取消置顶与取消归档（含 `includeArchived=true`）、会话状态与排队消息编辑/移除/引导（`GET .../state`、`POST .../queue/{itemId}`）、DSH 结构化用户提问接口、消息图片附件支持以及 `/healthz` 能力列表。
+- 同步更新 OpenAPI 3.1、AsyncAPI 3.0、Kotlin SDK（含 `AgentPreset` 字段安全默认值及 JVM 17 目标兼容 JDK 17/21）、中英双语 README、CI 基线（`dsh-v0.2.2-rc.5`）及两张真实 DSH `0.2.2-rc.5` WebUI 截图。
+- 完成全部本地验证：31 项 Vitest、8 项 Playwright 浏览器测试、Kotlin SDK 编译、隔离官方 `@deepseek-ai/dsh@0.2.2-rc.5` 真实安装/REST/WS/WebUI 端到端实测；正式 tarball `dsh-workspace-1.2.0.tgz` 2,636,618 字节，SHA-256 `e69ae22769d41de3cf324414b43686ac47edfd4841ac8fbae2e6511be2c75e8c`。
+
 ## 2026-10-26 · v1.1.0
 
 - 完成 `DSH-002`：适配 DeepSeek Harness `dsh-v0.2.1-rc.3`（`1f81c047fc48fa190a683e469daa699857e9afe8`）。DSH 0.2 移除 `ctx.apiProxy`，插件 Host 改为注入 session/workspace/settings/credentials/llm/agentPresets 控制器，并新增 in-process 桥接层复用现有 chat/settings adapter 与公开 BFF 合约。

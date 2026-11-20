@@ -7,10 +7,17 @@ import { defaultHighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { EditorView, highlightActiveLine, keymap, lineNumbers } from '@codemirror/view'
 import { useEffect, useRef } from 'react'
 
-export function CodeEditor(props: { path: string; value: string; onChange(value: string): void }): JSX.Element {
+export function CodeEditor(props: {
+  path: string
+  value: string
+  onChange(value: string): void
+  onSave?(): void
+}): JSX.Element {
   const host = useRef<HTMLDivElement>(null)
   const change = useRef(props.onChange)
+  const save = useRef(props.onSave)
   change.current = props.onChange
+  save.current = props.onSave
 
   useEffect(() => {
     const parent = host.current
@@ -22,7 +29,18 @@ export function CodeEditor(props: { path: string; value: string; onChange(value:
         history(),
         highlightActiveLine(),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-        keymap.of([...defaultKeymap, ...historyKeymap]),
+        keymap.of([
+          {
+            key: 'Mod-s',
+            preventDefault: true,
+            run: () => {
+              save.current?.()
+              return true
+            },
+          },
+          ...defaultKeymap,
+          ...historyKeymap,
+        ]),
         languageFor(props.path),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) change.current(update.state.doc.toString())

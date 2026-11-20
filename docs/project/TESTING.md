@@ -2,6 +2,7 @@
 
 | 日期 | 环境 | 验证 | 结果 |
 | --- | --- | --- | --- |
+| 2026-11-20 | Windows 11 / Node 24.18.0 / DSH `0.2.2-rc.5` / Chromium / JDK 21 (JVM 17 target) | v1.2.0 全套门禁 + 官方 `@deepseek-ai/dsh@0.2.2-rc.5` 真实端到端验证与截图刷新 | 通过；`tsc --noEmit`、13 个文件 / 31 项 Vitest、8 项 Playwright（Desktop + Pixel 7）、`docs:check`、`kotlin-sdk` Gradle 编译与 `tsdown` 三端产物均通过；隔离 `DSH_HOME` 安装 `dsh-workspace-1.2.0.tgz` 启动无 pending 告警，全量 REST/WS（含 `POST /manage/roots` 201、文件搜索、ETag 412、回收站、44 个 provider、6 条斜杠命令与 `/permission` 执行、会话置顶/归档恢复/检索/历史/状态/模型/提问/审批、WS `connection.ready`）与真实 WebUI 浏览器 0 报错/深色模式均通过；tarball 2,636,618 字节，SHA-256 `e69ae22769d41de3cf324414b43686ac47edfd4841ac8fbae2e6511be2c75e8c` |
 | 2026-08-15 | Windows 11 | 中英文 README 发布复验与 `pnpm pack --pack-destination artifacts` | 通过；指定截图环境说明已从仓库及 tarball 删除，两张实际效果图路径仍存在；12 个文件/24 项 Vitest、文档/API/SDK 和三份 bundle 一致；tarball 2,644,838 字节，SHA-256 `C4EB21A5A28D7C6B3529BFD59DEB7809D06850C3F0A2BB15C4DCBE52D0274823` |
 | 2026-08-15 | Windows 11 / Node 22.19.0 与 24 | listener 冲突回滚与测试稳定性复验 | 不同端口改为候选 listener 成功绑定后再切换，端口占用时不再中断旧 listener；测试预算调整为 15 秒；Node 22 连续 5 轮及 Node 24 一轮完整回归全部通过，共 144 项 Vitest |
 | 2026-08-15 | GitHub Actions / Windows、Ubuntu、macOS | [run 31839641415](https://github.com/Hakunm/dsh-workspace/actions/runs/31839641415) | 暴露 Windows runner 负载下默认 5 秒测试超时，以及失败重绑定短暂关闭旧 listener 导致的连接重置；其余九项作业通过，问题已按上一行修复并纳入最终矩阵 |

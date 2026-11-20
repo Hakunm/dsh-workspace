@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: DeepSeek Harness Mobile API
-  version: 1.1.0
+  version: 1.2.0
   description: Versioned file and chat BFF for mobile and third-party DSH clients. HTTP and HTTPS are both supported.
 servers:
   - url: http://127.0.0.1:3090/api/v1
@@ -24,7 +24,10 @@ paths:
                 properties:
                   ok: { type: boolean, const: true }
                   version: { type: string, const: v1 }
-                  pluginVersion: { type: string, const: 1.0.0 }
+                  pluginVersion: { type: string, const: 1.2.0 }
+                  capabilities:
+                    type: array
+                    items: { type: string }
   /pairings/exchange:
     post:
       security: []
@@ -143,6 +146,32 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/TrashItem' }
+        '403': { $ref: '#/components/responses/Error' }
+  /roots/{rootId}/search:
+    parameters:
+      - $ref: '#/components/parameters/RootId'
+    get:
+      operationId: searchEntries
+      description: Recursively searches authorized filenames and paths under a root without following symlinks outside the root.
+      parameters:
+        - name: query
+          in: query
+          required: true
+          schema: { type: string, minLength: 1 }
+        - $ref: '#/components/parameters/Path'
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 100 }
+        - name: includeHidden
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Bounded search matches under the authorized root.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FileSearchResult' }
+        '400': { $ref: '#/components/responses/Error' }
         '403': { $ref: '#/components/responses/Error' }
   /roots/{rootId}/content:
     parameters:
@@ -307,6 +336,16 @@ paths:
                   items:
                     type: array
                     items: { $ref: '#/components/schemas/AgentPreset' }
+  /chat/permissions:
+    get:
+      operationId: listPermissionCatalog
+      description: Lists the DSH permission preset catalog and default preset for mode switching.
+      responses:
+        '200':
+          description: Permission presets reported by DSH.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PermissionCatalog' }
   /settings/providers:
     get:
       operationId: listProviderSettings
@@ -404,9 +443,31 @@ paths:
                   models:
                     type: array
                     items: { $ref: '#/components/schemas/ProviderModel' }
+  /chat/sessions/search:
+    get:
+      operationId: searchChatSessions
+      description: Searches authorized chat sessions using DSH full-text search when available, with metadata fallback.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema: { type: string }
+        - name: includeArchived
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Matching authorized sessions and snippets.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionSearchResult' }
   /chat/sessions:
     get:
       operationId: listChatSessions
+      parameters:
+        - name: includeArchived
+          in: query
+          schema: { type: boolean, default: false }
       responses:
         '200':
           description: Sessions whose cwd is within a granted root.
@@ -500,6 +561,129 @@ paths:
       responses:
         '200': { description: Session archived. }
         '404': { $ref: '#/components/responses/Error' }
+  /chat/sessions/{sessionId}/unarchive:
+    post:
+      operationId: unarchiveChatSession
+      description: Restores an archived session back into default workspace views.
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Session unarchived. }
+        '404': { $ref: '#/components/responses/Error' }
+  /chat/sessions/{sessionId}/pin:
+    parameters:
+      - name: sessionId
+        in: path
+        required: true
+        schema: { type: string }
+    post:
+      operationId: pinChatSession
+      description: Pins the session in the DSH workspace sidebar.
+      responses:
+        '200': { description: Session pinned. }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: unpinChatSession
+      description: Removes the pin from the session.
+      responses:
+        '200': { description: Session unpinned. }
+        '404': { $ref: '#/components/responses/Error' }
+  /chat/sessions/{sessionId}/state:
+    get:
+      operationId: getChatSessionState
+      description: Returns live session cursor, active/running status, pending input queue, and pending user inputs.
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Live DSH session state.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionState' }
+        '404': { $ref: '#/components/responses/Error' }
+  /chat/sessions/{sessionId}/queue/{itemId}:
+    post:
+      operationId: updateSessionQueueItem
+      description: Edits, removes, or promotes (steers) a queued user turn in an active session.
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: itemId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind]
+              properties:
+                kind: { type: string, enum: [edit, remove, steer] }
+                text: { type: string }
+      responses:
+        '200': { description: Queue mutation accepted. }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /chat/sessions/{sessionId}/questions:
+    get:
+      operationId: listPendingQuestions
+      description: Lists pending or continued DSH user-question prompts for an authorized session.
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Pending structured questions.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/PendingQuestion' }
+        '404': { $ref: '#/components/responses/Error' }
+  /chat/sessions/{sessionId}/questions/{questionId}/answer:
+    post:
+      operationId: answerPendingQuestion
+      description: Submits user answers to a pending or continued DSH user-question prompt.
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema: { type: string }
+        - name: questionId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [answers]
+              properties:
+                answers:
+                  type: array
+                  items: { $ref: '#/components/schemas/QuestionAnswerItem' }
+      responses:
+        '202': { description: Answer accepted by DSH. }
+        '400': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
   /chat/sessions/{sessionId}/messages:
     parameters:
       - name: sessionId
@@ -526,12 +710,14 @@ paths:
           application/json:
             schema:
               type: object
-              required: [text]
               properties:
-                text: { type: string, minLength: 1 }
+                text: { type: string }
                 mode: { type: string, enum: [queue, steer], default: queue }
                 clientTimeZone: { type: string }
                 clientRequestId: { type: string, maxLength: 200 }
+                attachments:
+                  type: array
+                  items: { $ref: '#/components/schemas/ImageAttachment' }
       responses:
         '202': { description: Prompt accepted by DSH. }
         '409': { $ref: '#/components/responses/Error' }
@@ -783,6 +969,16 @@ components:
           type: array
           items: { $ref: '#/components/schemas/FileEntry' }
         nextCursor: { type: string }
+    FileSearchResult:
+      type: object
+      required: [query, path, entries, truncated]
+      properties:
+        query: { type: string }
+        path: { $ref: '#/components/schemas/WirePath' }
+        entries:
+          type: array
+          items: { $ref: '#/components/schemas/FileEntry' }
+        truncated: { type: boolean }
     TrashItem:
       type: object
       required: [id, rootId, path, kind, size, createdAt, status]
@@ -804,11 +1000,111 @@ components:
         updatedAt: { type: integer }
         running: { type: boolean }
         blank: { type: boolean }
+        pinned: { type: boolean }
+        archived: { type: boolean }
         title: { type: string }
         workspaceId: { type: string }
         workspaceTitle: { type: string }
         agentPreset: { type: string }
-        pendingInteraction: { type: string, enum: [approval] }
+        pendingInteraction: { type: string, enum: [approval, question] }
+    ImageAttachment:
+      type: object
+      required: [type, mediaType, data]
+      properties:
+        type: { type: string, const: image }
+        mediaType: { type: string }
+        data: { type: string, description: Base64-encoded image bytes. }
+        name: { type: string }
+    SessionSearchHit:
+      type: object
+      required: [sessionId, snippet, session]
+      properties:
+        sessionId: { type: string }
+        snippet: { type: string }
+        session: { $ref: '#/components/schemas/ChatSession' }
+    SessionSearchResult:
+      type: object
+      required: [items, hasMore, mode]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SessionSearchHit' }
+        hasMore: { type: boolean }
+        mode: { type: string, enum: [fulltext, metadata] }
+    SessionQueuedItem:
+      type: object
+      required: [id, placement, content]
+      properties:
+        id: { type: string }
+        placement: { type: string }
+        rpcId: { type: string }
+        content:
+          type: array
+          items: {}
+    SessionState:
+      type: object
+      required: [cursor, active, running, queue, pendingInput]
+      properties:
+        cursor: { type: integer }
+        active: { type: boolean }
+        running: { type: boolean }
+        queue:
+          type: [array, 'null']
+          items: { $ref: '#/components/schemas/SessionQueuedItem' }
+        pendingInput:
+          type: array
+          items: { type: string }
+    QuestionOption:
+      type: object
+      required: [label]
+      properties:
+        label: { type: string }
+        description: { type: string }
+    QuestionItem:
+      type: object
+      required: [id, question]
+      properties:
+        id: { type: string }
+        question: { type: string }
+        detail: { type: string }
+        header: { type: string }
+        options:
+          type: array
+          items: { $ref: '#/components/schemas/QuestionOption' }
+        multiSelect: { type: boolean }
+        intent:
+          type: object
+          additionalProperties: true
+    PendingQuestion:
+      type: object
+      required: [id, sessionId, state, timed, questions, requestedAt]
+      properties:
+        id: { type: string }
+        sessionId: { type: string }
+        callId: { type: string }
+        state: { type: string, enum: [open, continued] }
+        timed: { type: boolean }
+        questions:
+          type: array
+          items: { $ref: '#/components/schemas/QuestionItem' }
+        requestedAt: { type: integer }
+    QuestionAnswerItem:
+      type: object
+      required: [id, selected]
+      properties:
+        id: { type: string }
+        selected:
+          type: array
+          items: { type: string }
+        custom: { type: string }
+    PermissionCatalog:
+      type: object
+      required: [options, defaultPreset]
+      properties:
+        options:
+          type: array
+          items: { $ref: '#/components/schemas/PermissionOption' }
+        defaultPreset: { type: string }
     PendingApproval:
       type: object
       required: [id, sessionId, toolName, risk, requestedAt]
@@ -998,6 +1294,8 @@ components:
         configurable: { type: boolean }
         configured: { type: boolean }
         removable: { type: boolean }
+        defaultBaseURL: { type: string }
+        error: { type: string }
         credential: { $ref: '#/components/schemas/CredentialState' }
         config: { $ref: '#/components/schemas/ProviderConfig' }
     ProviderSettings:

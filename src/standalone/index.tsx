@@ -46,8 +46,8 @@ function Standalone(): JSX.Element {
   }
 
   const localAdmin = token === ''
-  return <div style={{ minHeight: '100vh' }}>
-    <div className="daw-root daw-toolbar" style={{ borderBottom: '1px solid #dfe4e8' }}>
+  return <div className="daw-root" style={{ minHeight: '100vh' }}>
+    <div className="daw-toolbar" style={{ borderBottom: '1px solid var(--daw-line)' }}>
       <strong>{t('appName')}</strong><span className="daw-toolbar-spacer" />
       {localAdmin && <button className="daw-icon" title={t('settings')} onClick={() => setSettings(true)}><Settings size={16} /></button>}
       {!localAdmin && <button className="daw-icon" title={t('forgetToken')} onClick={() => { localStorage.removeItem(TOKEN_KEY); setToken(''); setRequiresToken(true) }}><LogOut size={16} /></button>}

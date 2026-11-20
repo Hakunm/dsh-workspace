@@ -19,6 +19,8 @@ interface ConfigurableProvider {
   settingsPath: string[]
   active: boolean
   declared?: boolean
+  defaultBaseURL?: string
+  error?: string
 }
 
 export interface SettingsApiProxy extends DshApiProxy {
@@ -79,6 +81,8 @@ export interface ProviderView {
   displayName: string
   active: boolean
   declared?: boolean
+  defaultBaseURL?: string
+  error?: string
   configurable: boolean
   configured: boolean
   removable: boolean
@@ -135,15 +139,19 @@ export class DshSettingsAdapter {
     const protocols = protocolChoices(customNamespace)
     const rows = directory.providers.map((entry) => {
       const namespace = namespaces.get(entry.settingsNs)
-      const profile = mergeRecords(
-        recordAt(namespace?.base, entry.settingsPath),
-        recordAt(namespace?.value, entry.settingsPath),
-      )
+      const baseProfile = recordAt(namespace?.base, entry.settingsPath)
+      const valueProfile = recordAt(namespace?.value, entry.settingsPath)
+      const profile = mergeRecords(baseProfile, valueProfile)
       const userProfile = recordAt(namespace?.user, entry.settingsPath)
-      const ref = text(profile?.apiKeyEnv) ?? keyRef(entry.provider)
-      return { entry, namespace, profile, configured: profile !== undefined, removable: userProfile !== undefined, ref }
+      const configurable = entry.settingsNs !== ''
+      const configured = configurable && (entry.settingsPath.length === 0 ? namespace !== undefined : profile !== undefined)
+      const removable = configurable && entry.settingsPath.length > 0 && userProfile !== undefined
+      const ref = configurable && entry.provider !== 'deepseek-account'
+        ? (text(profile?.apiKeyEnv) ?? keyRef(entry.provider))
+        : ''
+      return { entry, namespace, profile, configurable, configured, removable, ref }
     })
-    const refs = [...new Set(rows.map(row => row.ref))]
+    const refs = [...new Set(rows.map(row => row.ref).filter(ref => ref !== ''))]
     const described = refs.length === 0
       ? { credentials: {} }
       : unwrapDsh(await this.api.credentials.describe({ rpcId: randomUUID(), payload: { refs } }))
@@ -155,15 +163,19 @@ export class DshSettingsAdapter {
         protocols,
         ...(customNamespace === undefined ? {} : { revision: customNamespace.revision }),
       },
-      providers: rows.map(({ entry, profile, configured, removable, ref }) => {
-        const credential = described.credentials[ref] ?? { configured: false, writable: false }
+      providers: rows.map(({ entry, profile, configurable, configured, removable, ref }) => {
+        const credential = ref === ''
+          ? { configured: entry.active, writable: false }
+          : (described.credentials[ref] ?? { configured: false, writable: false })
         const inheritedModels = catalog.groups.find(group => group.id === entry.provider)?.models
         return {
           id: entry.provider,
           displayName: text(profile?.displayName) ?? entry.displayName,
           active: entry.active,
           ...(entry.declared === undefined ? {} : { declared: entry.declared }),
-          configurable: entry.settingsNs !== '',
+          ...(entry.defaultBaseURL === undefined ? {} : { defaultBaseURL: entry.defaultBaseURL }),
+          ...(entry.error === undefined ? {} : { error: entry.error }),
+          configurable,
           configured,
           removable,
           credential: { ref, ...credential },

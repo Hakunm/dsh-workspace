@@ -10,13 +10,14 @@ import {
   HardDrive,
   RefreshCw,
   Save,
+  Search,
   Settings,
   Smartphone,
   Trash2,
   Upload,
   X,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { DeviceScope, DeviceView, FileEntryView, RootView } from '../shared/contracts.ts'
 import { DEVICE_SCOPES } from '../shared/contracts.ts'
 import { WorkspaceApi, WorkspaceApiError } from './api.ts'
@@ -27,6 +28,7 @@ import { PLUGIN_VERSION } from '../shared/version.ts'
 
 interface OpenFile {
   path: string
+  revision: number
   etag: string
   text: string
   savedText: string
@@ -51,7 +53,7 @@ export function WorkspaceApp(props: {
   compact?: boolean
   onOpenSettings?(): void
 }): JSX.Element {
-  installWorkspaceStyles()
+  useEffect(() => installWorkspaceStyles(), [])
   const { t } = useWorkspaceI18n()
   const [roots, setRoots] = useState<RootView[]>([])
   const [rootId, setRootId] = useState('')
@@ -63,6 +65,12 @@ export function WorkspaceApp(props: {
   const [refreshKey, setRefreshKey] = useState(0)
   const [command, setCommand] = useState<'file' | 'directory' | 'rename'>()
   const [commandValue, setCommandValue] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<FileEntryView[]>([])
+  const [searchTruncated, setSearchTruncated] = useState(false)
+  const [searching, setSearching] = useState(false)
+  const [searchError, setSearchError] = useState<unknown>()
+  const loadRevisionRef = useRef(0)
   const uploadRef = useRef<HTMLInputElement>(null)
 
   const refreshRoots = useCallback(async () => {
@@ -81,8 +89,42 @@ export function WorkspaceApp(props: {
     setSelected(undefined)
     setOpenFile(undefined)
     setCurrentDirectory('')
+    setSearchQuery('')
+    setSearchResults([])
+    setSearchTruncated(false)
+    setSearchError(undefined)
     setRefreshKey(value => value + 1)
   }, [rootId])
+
+  useEffect(() => {
+    const trimmed = searchQuery.trim()
+    if (rootId === '' || trimmed === '') {
+      setSearchResults([])
+      setSearchTruncated(false)
+      setSearching(false)
+      setSearchError(undefined)
+      return
+    }
+    let alive = true
+    setSearching(true)
+    const timer = setTimeout(() => {
+      void props.api.searchFiles(rootId, trimmed).then(result => {
+        if (!alive) return
+        setSearchResults(result.entries)
+        setSearchTruncated(result.truncated)
+        setSearchError(undefined)
+      }, cause => {
+        if (!alive) return
+        setSearchError(cause)
+      }).finally(() => {
+        if (alive) setSearching(false)
+      })
+    }, 220)
+    return () => {
+      alive = false
+      clearTimeout(timer)
+    }
+  }, [props.api, refreshKey, rootId, searchQuery])
 
   const openEntry = useCallback(async (entry: FileEntryView) => {
     setSelected({ path: entry.path, kind: entry.kind })
@@ -99,8 +141,10 @@ export function WorkspaceApp(props: {
     try {
       const content = await props.api.read(rootId, entry.path)
       const decoded = decodeText(content.bytes)
+      loadRevisionRef.current += 1
       setOpenFile({
         path: entry.path,
+        revision: loadRevisionRef.current,
         etag: content.etag,
         text: decoded.text,
         savedText: decoded.text,
@@ -220,36 +264,68 @@ export function WorkspaceApp(props: {
       </header>
       <div className="daw-body">
         <aside className="daw-tree" aria-label={t('fileTree')}>
-          {rootId === ''
-            ? <div className="daw-empty">{t('addRootHint')}</div>
-            : <DirectoryNode
-                api={props.api}
-                rootId={rootId}
-                path=""
-                label={roots.find(root => root.id === rootId)?.label ?? t('root')}
-                depth={0}
-                refreshKey={refreshKey}
-                {...(selected?.path === undefined ? {} : { selectedPath: selected.path })}
-                onEntry={entry => { void openEntry(entry) }}
-                onDirectory={path => setCurrentDirectory(path)}
-              />}
+          {rootId !== '' && <div className="daw-tree-search">
+            <Search size={14} aria-hidden="true" />
+            <input
+              type="search"
+              value={searchQuery}
+              placeholder={t('searchFiles')}
+              aria-label={t('searchFiles')}
+              onChange={event => setSearchQuery(event.target.value)}
+            />
+            {searchQuery !== '' && <button type="button" className="daw-icon" title={t('clearSearch')} onClick={() => setSearchQuery('')}><X size={13} /></button>}
+          </div>}
+          <div className="daw-tree-scroll">
+            {rootId === ''
+              ? <div className="daw-empty">{t('addRootHint')}</div>
+              : searchQuery.trim() !== ''
+                ? <>
+                    {searching && <div className="daw-list-meta">{t('searching')}</div>}
+                    {searchError !== undefined && <div className="daw-list-meta">{messageOf(searchError, t)}</div>}
+                    {!searching && searchError === undefined && searchResults.length === 0 && <div className="daw-list-meta">{t('noSearchResults')}</div>}
+                    {searchResults.map(entry => <button
+                      key={entry.path}
+                      className={`daw-search-row${selected?.path === entry.path ? ' selected' : ''}`}
+                      onClick={() => { void openEntry(entry) }}
+                    >
+                      {entry.kind === 'directory' ? <Folder size={15} /> : <File size={15} />}
+                      <span className="daw-search-meta">
+                        <span className="daw-search-name">{entry.name}</span>
+                        <span className="daw-search-path">{entry.path}</span>
+                      </span>
+                    </button>)}
+                    {searchTruncated && <div className="daw-list-meta" style={{ paddingTop: 6 }}>{t('searchTruncated', { count: searchResults.length })}</div>}
+                  </>
+                : <DirectoryNode
+                    api={props.api}
+                    rootId={rootId}
+                    path=""
+                    label={roots.find(root => root.id === rootId)?.label ?? t('root')}
+                    depth={0}
+                    refreshKey={refreshKey}
+                    {...(selected?.path === undefined ? {} : { selectedPath: selected.path })}
+                    onEntry={entry => { void openEntry(entry) }}
+                    onDirectory={path => setCurrentDirectory(path)}
+                  />}
+          </div>
         </aside>
         <main className="daw-editor-pane">
           <div className="daw-filebar">
             <span className="daw-filepath">{openFile?.path ?? (currentDirectory || t('selectFile'))}</span>
             <span className="daw-toolbar-spacer" />
             <button className="daw-icon" title={t('download')} disabled={openFile === undefined} onClick={() => { void download() }}><Download size={15} /></button>
-            <button className="daw-command primary" disabled={!dirty} onClick={() => { void save() }}><Save size={15} /> {t('save')}</button>
+            <button className="daw-command primary" title={`${t('save')} (Ctrl/Cmd+S)`} disabled={!dirty} onClick={() => { void save() }}><Save size={15} /> {t('save')}</button>
           </div>
           {openFile === undefined
             ? <div className="daw-empty">{t('chooseFile')}</div>
             : openFile.binary
               ? <div className="daw-binary"><div><strong>{t('binaryFile')}</strong><br />{t('binaryDisabled')}</div></div>
               : <CodeEditor
-                  key={`${openFile.path}:${openFile.etag}`}
+                  key={`${openFile.path}:${openFile.revision}`}
                   path={openFile.path}
                   value={openFile.text}
                   onChange={text => setOpenFile(file => file === undefined ? file : { ...file, text })}
+                  onSave={() => { void save() }}
                 />}
           <div className={`daw-status${error === undefined ? '' : ' error'}`}>{error === undefined ? t(status.key, status.values) : messageOf(error, t)}{dirty ? ` · ${t('unsavedChanges')}` : ''}</div>
         </main>

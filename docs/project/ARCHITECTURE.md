@@ -21,9 +21,9 @@ flowchart LR
 
 包同时声明 `dsh.bundle` 和 `dsh.client`。Profile patch 插入一个 Host row；DSH client module scanner 从同一包发现 `./client`，因此安装者只需执行一次 `dsh plugin add`。
 
-Web Client 使用独立的外部语言 store 跨多个 DSH slot React 根同步界面语言，默认值为 `zh-CN`。语言按钮切换 `zh-CN`/`en` 并写入浏览器存储；slot 注册会随语言变化刷新标签，独立工作区同时更新文档标题和 `lang` 属性。
+Web Client 使用独立的外部语言 store 跨多个 DSH slot React 根同步界面语言，默认值为 `zh-CN`。语言按钮切换 `zh-CN`/`en` 并写入浏览器存储；slot 注册会随语言变化刷新标签，独立工作区同时更新文档标题和 `lang` 属性。样式表通过引用计数注入并在 `ctx.effect` 中随插件卸载清理，同时响应 DSH `body[data-ds-dark-theme]` 深色模式和独立页系统配色。
 
-`sidebar.footer.action` 是桌面端主要入口，触发 `shell.overlay` 中的完整文件树和编辑器，不改变 DSH 页面 URL。overlay 使用 `closed/workspace/settings` 状态机；从工作区打开设置时仅隐藏而不卸载编辑器，关闭设置后保留目录、当前文件和未保存文本。`conversation.view` 保留会话内文件标签，`/dsh-workspace` 仅作为移动 WebView、直接链接和故障排查入口。
+`sidebar.footer.action` 是桌面端主要入口，触发 `shell.overlay` 中的完整文件树（含防抖文件名递归搜索）、CodeMirror 6 编辑器（支持 `Ctrl/Cmd+S` 保存且保留光标与撤销栈），不改变 DSH 页面 URL。overlay 使用 `closed/workspace/settings` 状态机；从工作区打开设置时仅隐藏而不卸载编辑器，关闭设置后保留目录、当前文件和未保存文本。`conversation.view` 保留会话内文件标签，`/dsh-workspace` 仅作为移动 WebView、直接链接和故障排查入口。
 
 ## 数据流
 
@@ -32,9 +32,9 @@ Web Client 使用独立的外部语言 store 跨多个 DSH slot React 根同步�
 - listener 在 SQLite 中持久化远程绑定 IP 和端口；关闭状态绑定同地址族回环，启用状态绑定配置地址。所有重绑定先保留旧 endpoint，失败时恢复旧 endpoint 后再报告错误。
 - Router 先解析 principal，再检查 scope 和 root grant，最后把 `rootId + relativePath` 交给文件服务。
 - 聊天 adapter 通过 Host 桥接层调用 DSH 0.2 的 `sessionController`、`workspaceController` 与 `agentPresets` 处理会话、工作区、模型与消息，并用 `ctx.agents + ctx.commands` 列出/执行 host 斜杠命令；它不转发或依赖 DSH 私有 `/api` HTTP wire。冷会话通过模型查询取得 host agent 后再访问命令注册表。命令执行前仍执行 session/root 授权和当前命令列表校验，且绝不改走模型 prompt。会话创建优先使用 DSH `workspaceId`；工作区发现先读取 `workspace.list`，再按设备授权根过滤并把真实路径改写为 `rootId + relativePath`。新工作区登记先通过文件授权边界解析现有目录，再调用 `workspace.create`。Agent 模式来自 `agentPreset.list`；`agentPreset.select` 只为仍为 `blank` 的授权会话开放，宿主在执行时再次检查以避免首条消息与切换竞态。
-- 审批请求由 DSH mux 的 `approval/requested` 驱动，adapter 以 `sessionId + approvalId` 缓存待处理项并把私有 `rpcId` 留在 Host 内；读取时从授权历史提取匹配工具调用，经过脱敏和长度限制后投影。设备只可提交 `allowed-once` 或 `rejected`，Host 再组装 DSH `client-response`；`approval/resolved` 或成功决定会清除缓存，mux 重连的待处理重放用于恢复状态。
-- 设置 adapter 使用 DSH 稳定的 `llm.providers/models/discoverModels`、`settings.describe/mutate` 和 `credentials.describe/set/unset` 服务。读取时合并模板基值与用户覆盖，并用实时模型目录补足继承模型；自定义供应商写入 DSH 的 `llm-pi-ai/providers/<route>` 命名空间，协议选择从 DSH schema 提取。外部接口只投影可显示配置与凭据状态；API 密钥只写不读。会话模型选择继续先执行授权 session 检查。
-- 文件事件和已授权的 DSH mux/host 事件经 WebSocket 广播；`assistant/chunk` 在 BFF 边界被规范化为 `chat.message.delta`，完成消息、会话状态、Agent 切换和审批变化也使用稳定事件名，移动端不解析 DSH 私有事件形状。每次广播重新读取设备状态并检查事件类别 scope 与 root/session，重连后客户端重新读取 REST 基线。
+- 审批与用户提问由 `approval/request` 与 `user-questions/request` waterfall（`{ prepend: true }`）驱动：桥接层向移动端广播事件的同时并行调用 `next()`，让移动端与 DSH WebUI 自由竞态、互不阻塞；先落锤的一方触发 `approval/resolved` / `question/resolved` 清理另一端状态，并支持 DSH 0.2.2 定时问题进入 `continued` 状态后的 `userQuestions.answer(...)` 回填。
+- 设置 adapter 通过桥接层合并 `llm.listProviders()` 与 `llm.listConfigurableProviders()` 还原 provider 活跃状态并保留 `deepseek-account`，凭据查询按 64 个 ref 自动分批以遵循 DSH 上限；读取时合并模板基值与用户覆盖并用实时模型目录补足继承模型，API 密钥只写不读。
+- 文件事件和已授权的 DSH mux/host 事件经多订阅者独立有界扇出队列通过 WebSocket 广播；桥接层订阅 `agent/assistant-stream`（`start`/`chunk`/`end`）并在 BFF 边界规范化为 `chat.message.delta`，完成消息、会话状态、Agent 切换、审批和提问变化均使用稳定事件名。每次广播重新读取设备状态并检查事件类别 scope 与 root/session，重连后客户端重新读取 REST 基线。
 
 ## 持久化
 

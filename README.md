@@ -9,19 +9,19 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-v1.1.0-087f8c">
-  <img alt="DSH plugin" src="https://img.shields.io/badge/DeepSeek_Harness-plugin-1f2328">
+  <img alt="Version" src="https://img.shields.io/badge/version-v1.2.0-087f8c">
+  <img alt="DSH" src="https://img.shields.io/badge/DeepSeek_Harness-0.2.2--rc.5-1f2328">
   <img alt="Platforms" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-586069">
   <img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-2da44e">
 </p>
 
-`dsh-workspace` 是 DeepSeek Harness（DSH）的 WebUI 文件工作区与远程访问插件。安装后，你可以留在 DSH WebUI 里浏览、编辑和整理本机文件，也可以让 [dsh-android-app](https://github.com/Hakunm/dsh-android-app) 通过版本化 API 连接同一套聊天、工作区和文件能力。
+`dsh-workspace` 是 DeepSeek Harness（DSH）的 WebUI 文件工作区与远程访问插件。安装后，你可以留在 DSH WebUI 里浏览、搜索、编辑和整理本机文件，也可以让 [dsh-android-app](https://github.com/Hakunm/dsh-android-app) 通过版本化 API 连接同一套聊天、工作区、审批、提问和文件能力。
 
-界面默认中文，可随时切换 English。插件支持 Windows、macOS 和 Linux，安装包已经包含编译产物，不要求用户在服务器上重新构建。
+界面默认中文，可随时切换 English，并自动跟随 DSH WebUI 的浅色 / 深色主题。插件支持 Windows、macOS 和 Linux，安装包已经包含编译产物，不要求用户在服务器上重新构建。
 
 ## 实际效果
 
-文件工作区直接显示在 DSH WebUI 中，目录树、编辑器和文件操作集中在同一个窗口。
+文件工作区直接显示在 DSH WebUI 中，文件搜索、目录树、编辑器和文件操作集中在同一个窗口。
 
 ![DSH WebUI 中的文件工作区](./assets/screenshots/workspace-editor.png)
 
@@ -33,14 +33,14 @@
 
 ### 环境要求
 
-- 已安装并能正常启动的 DeepSeek Harness WebUI
+- 已安装并能正常启动的 DeepSeek Harness WebUI（推荐 `0.2.2-rc.5` 及以上）
 - Node.js `^22.19.0` 或 `>=24.0.0`
 - 默认端口 `3090` 可用，或准备一个其他端口
 
 使用运行 DSH WebUI 的同一系统用户执行：
 
 ```sh
-dsh plugin --profile web add https://github.com/Hakunm/dsh-workspace/releases/download/v1.1.0/dsh-workspace-1.1.0.tgz
+dsh plugin --profile web add https://github.com/Hakunm/dsh-workspace/releases/download/v1.2.0/dsh-workspace-1.2.0.tgz
 npx @deepseek-ai/dsh web
 ```
 
@@ -49,14 +49,14 @@ npx @deepseek-ai/dsh web
 从 GitHub Release 下载离线安装包时，可直接安装 tarball：
 
 ```sh
-dsh plugin --profile web add ./dsh-workspace-1.1.0.tgz
+dsh plugin --profile web add ./dsh-workspace-1.2.0.tgz
 ```
 
 ## 第一次使用
 
 1. 在 DSH WebUI 中打开“文件”，点击右上角的“工作区设置”。
 2. 在“根目录”页添加允许管理的本机目录，并为它起一个容易识别的名字。
-3. 返回文件工作区，选择授权根后即可浏览和编辑文件。
+3. 返回文件工作区，选择授权根后即可浏览、搜索和编辑文件。
 4. 需要连接手机时，进入“远程访问”，填写绑定 IP 和端口并保存。
 5. 点击“启用并创建配对”，再将十分钟内有效的一次性配对码填入 App。
 
@@ -66,9 +66,10 @@ dsh plugin --profile web add ./dsh-workspace-1.1.0.tgz
 
 ### 在 DSH WebUI 中管理文件
 
-- 懒加载浏览目录，新建文件或文件夹。
+- 懒加载浏览目录、递归搜索文件名（自动忽略 `.git` / `node_modules` 且不越界追踪符号链接），新建文件或文件夹。
 - 上传、下载、替换、重命名和移动文件。
-- 使用 CodeMirror 6 查看和编辑 UTF-8 文本。
+- 使用 CodeMirror 6 查看和编辑 UTF-8 文本，支持 `Ctrl+S` / `Cmd+S` 快捷保存并保持光标与撤销栈。
+- 自动跟随 DSH WebUI 深色 / 浅色外观（独立页同时跟随系统外观）。
 - 尽量保留 UTF-8 BOM 与原有换行风格。
 - 使用 ETag 检测外部修改，遇到冲突时拒绝静默覆盖。
 - 删除内容时先进入插件回收站，之后可恢复或由本机管理员永久清理。
@@ -79,12 +80,12 @@ dsh plugin --profile web add ./dsh-workspace-1.1.0.tgz
 公开 API 不依赖 DSH 私有协议，可用于：
 
 - 查看、新建、重命名和移除 DSH 工作区登记。
-- 创建、重命名、分叉和归档会话。
-- 读取消息、流式接收正文和思考、追加引导或取消运行。
-- 查看 TODO、斜杠命令、权限模式和待审批操作。
+- 创建、重命名、分叉、置顶、归档、恢复归档和搜索会话。
+- 读取历史消息、实时流式接收正文和思考（`agent/assistant-stream`）、发送文本或图片附件、管理排队消息（编辑 / 删除 / 立即引导）以及取消运行。
+- 查看 TODO、权限预设目录、斜杠命令、待审批操作（与 WebUI 并行不互相阻塞）以及 DSH 结构化用户提问。
 - 选择 Agent、模型和思考强度。
-- 查看或修改模型供应商，支持完全自定义供应商。
-- 管理设备获准访问的文件和回收站项目。
+- 查看或修改内置及完全自定义模型供应商。
+- 管理、搜索设备获准访问的文件和回收站项目。
 
 ## 远程访问与安全
 
@@ -112,10 +113,11 @@ dsh plugin --profile web add ./dsh-workspace-1.1.0.tgz
 - wire path 统一使用 `/`。
 - 拒绝绝对路径、盘符、UNC、反斜杠、空字节以及 `.`、`..` 路径段。
 - 每次操作逐段检查 symlink、junction 和 reparse point，禁止借助链接逃出授权根。
+- 递归文件搜索遇到符号链接或目录联接时绝不穿透目录目标。
 - 删除末端链接时只删除链接本身，不递归进入链接目标。
 - 临时保存文件放在目标目录中，避免跨挂载点替换失败。
 
-“移除 DSH 工作区”只删除 WebUI 中的登记，服务器目录、文件和会话日志不会被删除。“归档会话”只将会话从默认列表隐藏，日志仍会保留。
+“移除 DSH 工作区”只删除 WebUI 中的登记，服务器目录、文件和会话日志不会被删除。“归档会话”只将会话从默认列表隐藏，日志仍会保留，并可随时恢复归档。
 
 ## 对外接口
 
@@ -133,27 +135,30 @@ Authorization: Bearer DEVICE_TOKEN
 
 | 接口 | 用途 |
 | --- | --- |
-| `GET /healthz` | 查看服务状态、API 版本和插件版本 |
+| `GET /healthz` | 查看服务状态、API 版本、插件版本和能力列表 |
 | `POST /pairings/exchange` | 使用一次性配对码换取设备令牌 |
 | `GET /devices/self` | 查看当前设备、权限和根目录授权 |
 | `GET /roots` | 列出设备可访问的文件根 |
 | `GET/POST/PATCH/DELETE /roots/{rootId}/entries` | 列目录、新建、移动、重命名和移入回收站 |
+| `GET /roots/{rootId}/search` | 在授权根内按关键字递归搜索文件与目录 |
 | `GET/PUT /roots/{rootId}/content` | 读取、Range 下载、上传和带 ETag 保存 |
 | `GET /trash`、`POST /trash/{id}/restore` | 查看与恢复回收项 |
 | `GET/POST /chat/workspaces` | 列出或登记 DSH 工作区 |
 | `PATCH/DELETE /chat/workspaces/{id}` | 重命名或移除工作区登记 |
-| `GET/POST /chat/sessions` | 列出或创建会话 |
-| `PATCH /chat/sessions/{id}` | 重命名会话 |
-| `POST /chat/sessions/{id}/fork` | 分叉会话 |
-| `POST /chat/sessions/{id}/archive` | 归档会话 |
-| `GET/POST /chat/sessions/{id}/messages` | 读取历史、发送消息或追加引导 |
+| `GET /chat/agent-presets`、`GET /chat/permissions` | 列出可用 Agent Preset 与权限预设目录 |
+| `GET/POST /chat/sessions`、`GET /chat/sessions/search` | 列出（支持 `includeArchived`）、创建和搜索会话 |
+| `PATCH /chat/sessions/{id}`、`POST .../fork` | 重命名或分叉会话 |
+| `POST .../archive`、`POST .../unarchive`、`POST/DELETE .../pin` | 归档、取消归档和置顶 / 取消置顶会话 |
+| `GET /chat/sessions/{id}/state`、`POST .../queue/{itemId}` | 查询运行/队列状态并编辑、移除或立即引导排队消息 |
+| `GET/POST /chat/sessions/{id}/messages` | 读取历史、发送文本/图片附件消息或追加引导 |
 | `GET/POST /chat/sessions/{id}/commands` | 列出或执行 host 斜杠命令 |
 | `GET/POST /chat/sessions/{id}/approvals...` | 查看和处理待审批操作 |
+| `GET/POST /chat/sessions/{id}/questions...` | 查看并回答 DSH 结构化用户提问 |
 | `GET /chat/sessions/{id}/models`、`PUT .../model` | 读取模型目录并切换模型或思考强度 |
 | `PUT /chat/sessions/{id}/agent-preset` | 在首条消息前切换 Agent |
 | `POST /chat/runs/{id}/cancel` | 取消正在运行的会话 |
 | `GET/POST/PATCH/DELETE /settings/...` | 管理供应商、凭据状态、模型发现和自定义供应商 |
-| `WS /events` | 接收聊天增量、运行、审批和文件变更事件 |
+| `WS /events` | 接收聊天增量、运行、审批、提问和文件变更事件 |
 
 完整字段、响应和错误模型见 [OpenAPI 3.1](./docs/api/openapi.yaml)，实时事件格式见 [AsyncAPI](./docs/api/asyncapi.yaml)。仓库同时提供 [Kotlin SDK](./kotlin-sdk/README.md)。
 
@@ -167,9 +172,9 @@ Authorization: Bearer DEVICE_TOKEN
 
 | Scope | 允许的操作 |
 | --- | --- |
-| `chat.read` | 查看工作区、会话、消息、TODO、命令和审批 |
-| `chat.write` | 管理工作区与会话、发消息、切换配置、执行命令和处理审批 |
-| `files.read` | 浏览、读取和下载文件，查看回收站 |
+| `chat.read` | 查看工作区、会话、消息、TODO、权限目录、命令、审批与提问 |
+| `chat.write` | 管理工作区与会话、发消息与附件、操作队列、切换配置、执行命令、处理审批与回答提问 |
+| `files.read` | 浏览、搜索、读取和下载文件，查看回收站 |
 | `files.write` | 新建、编辑、上传、移动和重命名 |
 | `files.delete` | 将文件或目录移入插件回收站 |
 | `settings.read` | 查看供应商有效配置和凭据是否已配置 |
@@ -191,7 +196,7 @@ dsh plugin --profile web remove dsh-workspace
 
 **安装后看不到“文件”入口**
 
-确认插件安装在 `web` profile，并在安装后重启 DSH WebUI。
+确认插件安装在 `web` profile，并在安装后重启 DSH WebUI；同时确认使用的是 `v1.2.0`（适配 DSH `0.2.2-rc.5` 的 `@deepseek-ai/dsh-client-ui-renderer` 客户端入口）。
 
 **“启用并创建配对”按钮不可用**
 
@@ -213,11 +218,11 @@ pnpm check
 pnpm pack
 ```
 
-v1.1.0 基于 DSH `dsh-v0.2.1-rc.3`（npm `@deepseek-ai/dsh@0.2.1-rc.3`）开发，CI 覆盖 Windows、Ubuntu 和 macOS。
+v1.2.0 基于 DSH `dsh-v0.2.2-rc.5`（npm `@deepseek-ai/dsh@0.2.2-rc.5`）适配并完成真实端到端验证，CI 覆盖 Windows、Ubuntu 和 macOS。
 
 ## 项目信息
 
-- 当前版本：`v1.1.0`
+- 当前版本：`v1.2.0`
 - 作者：[Github@Hakunm](https://github.com/Hakunm)
 - 许可证：[GNU Affero General Public License v3.0](./LICENSE)
 - Android 客户端：[dsh-android-app](https://github.com/Hakunm/dsh-android-app)

@@ -63,15 +63,24 @@ for (const route of [
   '/devices/self',
   '/roots',
   '/roots/{rootId}/entries',
+  '/roots/{rootId}/search',
   '/roots/{rootId}/content',
   '/trash',
   '/trash/{trashId}/restore',
   '/chat/sessions',
+  '/chat/sessions/search',
+  '/chat/permissions',
   '/chat/workspaces',
   '/chat/workspaces/{workspaceId}',
   '/chat/sessions/{sessionId}',
   '/chat/sessions/{sessionId}/fork',
   '/chat/sessions/{sessionId}/archive',
+  '/chat/sessions/{sessionId}/unarchive',
+  '/chat/sessions/{sessionId}/pin',
+  '/chat/sessions/{sessionId}/state',
+  '/chat/sessions/{sessionId}/queue/{itemId}',
+  '/chat/sessions/{sessionId}/questions',
+  '/chat/sessions/{sessionId}/questions/{questionId}/answer',
   '/chat/sessions/{sessionId}/messages',
   '/chat/sessions/{sessionId}/approvals',
   '/chat/sessions/{sessionId}/approvals/{approvalId}/decision',
@@ -97,8 +106,12 @@ if (!kotlin.includes('listPendingApprovals') || !kotlin.includes('decideApproval
 if (!kotlin.includes('listSessionCommands') || !kotlin.includes('executeSessionCommand')) failures.push('Kotlin SDK is missing slash command interaction')
 if (!kotlin.includes('renameChatWorkspace') || !kotlin.includes('deleteChatWorkspace')) failures.push('Kotlin SDK is missing workspace management')
 if (!kotlin.includes('renameSession') || !kotlin.includes('forkSession') || !kotlin.includes('archiveSession')) failures.push('Kotlin SDK is missing session management')
+if (!kotlin.includes('unarchiveSession') || !kotlin.includes('pinSession') || !kotlin.includes('unpinSession')) failures.push('Kotlin SDK is missing session pin/unarchive management')
+if (!kotlin.includes('searchFiles') || !kotlin.includes('searchSessions') || !kotlin.includes('listPermissionCatalog')) failures.push('Kotlin SDK is missing search or permission catalog')
+if (!kotlin.includes('listPendingQuestions') || !kotlin.includes('answerQuestion') || !kotlin.includes('getSessionState') || !kotlin.includes('updateQueue')) failures.push('Kotlin SDK is missing user questions or queue management')
 if (!asyncapi.includes('chat.message.delta')) failures.push('AsyncAPI is missing stable chat delta events')
 if (!asyncapi.includes('chat.approval.requested')) failures.push('AsyncAPI is missing approval events')
+if (!asyncapi.includes('chat.question.requested')) failures.push('AsyncAPI is missing user-question events')
 
 const trackedText = [
   await readFile(path.join(root, 'README.md'), 'utf8'),

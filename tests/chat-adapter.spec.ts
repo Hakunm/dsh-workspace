@@ -57,7 +57,9 @@ describe('DSH chat choices', () => {
           { name: 'permission', description: 'Switch permission preset', input: { hint: '<preset>' } },
           { name: 'compact', description: 'Compact session context' },
         ] : [],
-        execute: async (_agent, line) => {
+        execute: async (_agent, line, attachments, signal) => {
+          expect(Array.isArray(attachments)).toBe(true)
+          expect(signal).toBeInstanceOf(AbortSignal)
           commandLines.push(line)
           return { commandId: 'command-1', result: { kind: 'success', text: 'preset workspace-write' } }
         },

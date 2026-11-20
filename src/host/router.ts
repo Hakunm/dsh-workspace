@@ -85,7 +85,22 @@ export class ApiRouter {
     const pathname = url.pathname.replace(/\/$/, '') || '/'
 
     if (method === 'GET' && pathname === '/api/v1/healthz') {
-      sendJson(res, 200, { ok: true, version: 'v1', pluginVersion: PLUGIN_VERSION })
+      sendJson(res, 200, {
+        ok: true,
+        version: 'v1',
+        pluginVersion: PLUGIN_VERSION,
+        capabilities: [
+          'streaming',
+          'permissions',
+          'questions',
+          'pin',
+          'unarchive',
+          'search',
+          'file-search',
+          'queue',
+          'image-attachments',
+        ],
+      })
       return
     }
 
@@ -124,13 +139,27 @@ export class ApiRouter {
       return
     }
 
-    const rootRoute = pathname.match(/^\/api\/v1\/roots\/([^/]+)\/(entries|content)$/)
+    const rootRoute = pathname.match(/^\/api\/v1\/roots\/([^/]+)\/(entries|content|search)$/)
     if (rootRoute !== null) {
       const rootId = decodeURIComponent(rootRoute[1] as string)
       const resource = rootRoute[2]
       const root = this.requireRoot(principal, rootId)
       if (resource === 'entries') {
         await this.dispatchEntries(req, res, url, principal, root, requestId)
+        return
+      }
+      if (resource === 'search') {
+        if (method !== 'GET') throw new ApiError(405, 'METHOD_NOT_ALLOWED', 'Only GET is supported for file search.')
+        this.options.auth.requireScope(principal, 'files.read')
+        const query = url.searchParams.get('q') ?? url.searchParams.get('query') ?? ''
+        const relativePath = url.searchParams.get('path') ?? ''
+        const limit = optionalInteger(url.searchParams.get('limit'))
+        const includeHidden = url.searchParams.get('includeHidden') === 'true'
+        sendJson(res, 200, await this.options.files.search(root, query, {
+          relativePath,
+          ...(limit === undefined ? {} : { limit }),
+          includeHidden,
+        }))
         return
       }
       await this.dispatchContent(req, res, url, principal, root, requestId)
@@ -199,6 +228,12 @@ export class ApiRouter {
     if (method === 'GET' && pathname === '/api/v1/chat/agent-presets') {
       this.options.auth.requireScope(principal, 'chat.read')
       sendJson(res, 200, { items: await this.options.chat.listAgentPresets() })
+      return
+    }
+
+    if (method === 'GET' && pathname === '/api/v1/chat/permissions') {
+      this.options.auth.requireScope(principal, 'chat.read')
+      sendJson(res, 200, await this.options.chat.listPermissionCatalog())
       return
     }
 
@@ -281,10 +316,19 @@ export class ApiRouter {
       return
     }
 
+    if (method === 'GET' && pathname === '/api/v1/chat/sessions/search') {
+      this.options.auth.requireScope(principal, 'chat.read')
+      const query = url.searchParams.get('q') ?? ''
+      const includeArchived = url.searchParams.get('includeArchived') === 'true'
+      sendJson(res, 200, await this.options.chat.searchSessions(principal, query, { includeArchived }))
+      return
+    }
+
     if (pathname === '/api/v1/chat/sessions') {
       if (method === 'GET') {
         this.options.auth.requireScope(principal, 'chat.read')
-        sendJson(res, 200, { items: await this.options.chat.listSessions(principal) })
+        const includeArchived = url.searchParams.get('includeArchived') === 'true'
+        sendJson(res, 200, { items: await this.options.chat.listSessions(principal, { includeArchived }) })
         return
       }
       if (method === 'POST') {
@@ -359,6 +403,95 @@ export class ApiRouter {
       return
     }
 
+    const unarchiveSessionRoute = pathname.match(/^\/api\/v1\/chat\/sessions\/([^/]+)\/unarchive$/)
+    if (method === 'POST' && unarchiveSessionRoute !== null) {
+      this.options.auth.requireScope(principal, 'chat.write')
+      const sessionId = decodeURIComponent(unarchiveSessionRoute[1] as string)
+      await this.options.chat.unarchiveSession(principal, sessionId)
+      this.audit(principal, 'chat.session.unarchive', undefined, undefined, requestId, { sessionId })
+      sendJson(res, 200, { archived: false })
+      return
+    }
+
+    const pinSessionRoute = pathname.match(/^\/api\/v1\/chat\/sessions\/([^/]+)\/pin$/)
+    if (pinSessionRoute !== null) {
+      const sessionId = decodeURIComponent(pinSessionRoute[1] as string)
+      if (method === 'POST') {
+        this.options.auth.requireScope(principal, 'chat.write')
+        await this.options.chat.pinSession(principal, sessionId)
+        this.audit(principal, 'chat.session.pin', undefined, undefined, requestId, { sessionId })
+        sendJson(res, 200, { pinned: true })
+        return
+      }
+      if (method === 'DELETE') {
+        this.options.auth.requireScope(principal, 'chat.write')
+        await this.options.chat.unpinSession(principal, sessionId)
+        this.audit(principal, 'chat.session.unpin', undefined, undefined, requestId, { sessionId })
+        sendJson(res, 200, { pinned: false })
+        return
+      }
+    }
+
+    const sessionStateRoute = pathname.match(/^\/api\/v1\/chat\/sessions\/([^/]+)\/state$/)
+    if (method === 'GET' && sessionStateRoute !== null) {
+      this.options.auth.requireScope(principal, 'chat.read')
+      const sessionId = decodeURIComponent(sessionStateRoute[1] as string)
+      sendJson(res, 200, await this.options.chat.sessionState(principal, sessionId))
+      return
+    }
+
+    const queueMutationRoute = pathname.match(/^\/api\/v1\/chat\/sessions\/([^/]+)\/queue\/([^/]+)$/)
+    if (method === 'POST' && queueMutationRoute !== null) {
+      this.options.auth.requireScope(principal, 'chat.write')
+      const sessionId = decodeURIComponent(queueMutationRoute[1] as string)
+      const itemId = decodeURIComponent(queueMutationRoute[2] as string)
+      const body = await readJson(req, 262_144) as Record<string, unknown>
+      const kind = body.kind
+      if (kind !== 'edit' && kind !== 'remove' && kind !== 'steer') {
+        throw new ApiError(400, 'BODY_INVALID', 'kind must be edit, remove, or steer.')
+      }
+      if (kind === 'edit' && typeof body.text !== 'string') {
+        throw new ApiError(400, 'BODY_INVALID', 'text is required when kind is edit.')
+      }
+      await this.options.chat.updateQueue(
+        principal,
+        sessionId,
+        itemId,
+        kind === 'edit' ? { kind: 'edit', text: body.text as string } : { kind },
+      )
+      this.audit(principal, 'chat.queue.update', undefined, undefined, requestId, { sessionId, itemId, kind })
+      sendJson(res, 200, { accepted: true })
+      return
+    }
+
+    const questionsRoute = pathname.match(/^\/api\/v1\/chat\/sessions\/([^/]+)\/questions$/)
+    if (method === 'GET' && questionsRoute !== null) {
+      this.options.auth.requireScope(principal, 'chat.read')
+      const sessionId = decodeURIComponent(questionsRoute[1] as string)
+      sendJson(res, 200, { items: await this.options.chat.listPendingQuestions(principal, sessionId) })
+      return
+    }
+
+    const answerQuestionRoute = pathname.match(/^\/api\/v1\/chat\/sessions\/([^/]+)\/questions\/([^/]+)\/answer$/)
+    if (method === 'POST' && answerQuestionRoute !== null) {
+      this.options.auth.requireScope(principal, 'chat.write')
+      const sessionId = decodeURIComponent(answerQuestionRoute[1] as string)
+      const questionId = decodeURIComponent(answerQuestionRoute[2] as string)
+      const body = await readJson(req, 131_072) as Record<string, unknown>
+      if (!Array.isArray(body.answers)) {
+        throw new ApiError(400, 'BODY_INVALID', 'answers must be an array.')
+      }
+      await this.options.chat.answerQuestion(
+        principal,
+        sessionId,
+        questionId,
+        body.answers as Parameters<typeof this.options.chat.answerQuestion>[3],
+      )
+      this.audit(principal, 'chat.question.answer', undefined, undefined, requestId, { sessionId, questionId })
+      sendJson(res, 202, { accepted: true })
+      return
+    }
+
     const messagesRoute = pathname.match(/^\/api\/v1\/chat\/sessions\/([^/]+)\/messages$/)
     if (messagesRoute !== null) {
       const sessionId = decodeURIComponent(messagesRoute[1] as string)
@@ -374,24 +507,41 @@ export class ApiRouter {
       }
       if (method === 'POST') {
         this.options.auth.requireScope(principal, 'chat.write')
-        const body = await readJson(req, 1_000_000) as Record<string, unknown>
+        const body = await readJson(req, Math.max(1_000_000, this.options.maxUploadBytes)) as Record<string, unknown>
         const cached = this.readIdempotent(principal, body.clientRequestId)
         if (cached !== undefined) {
           sendJson(res, cached.status, cached.body)
           return
         }
-        if (typeof body.text !== 'string') throw new ApiError(400, 'BODY_INVALID', 'text is required.')
+        const attachments = Array.isArray(body.attachments)
+          ? body.attachments.filter((item): item is { type: 'image'; mediaType: string; data: string; name?: string } => (
+              typeof item === 'object'
+              && item !== null
+              && (item as Record<string, unknown>).type === 'image'
+              && typeof (item as Record<string, unknown>).mediaType === 'string'
+              && typeof (item as Record<string, unknown>).data === 'string'
+            ))
+          : []
+        if (typeof body.text !== 'string' && attachments.length === 0) {
+          throw new ApiError(400, 'BODY_INVALID', 'text or attachments is required.')
+        }
+        const text = typeof body.text === 'string' ? body.text : ''
         const mode = body.mode === 'steer' ? 'steer' : 'queue'
         const result = await this.options.chat.prompt(
           principal,
           sessionId,
-          body.text,
+          text,
           mode,
           typeof body.clientTimeZone === 'string' ? body.clientTimeZone : undefined,
+          attachments,
         )
         const response = { message: result }
         this.saveIdempotent(principal, body.clientRequestId, 202, response)
-        this.audit(principal, 'chat.message.submit', undefined, undefined, requestId, { sessionId, mode })
+        this.audit(principal, 'chat.message.submit', undefined, undefined, requestId, {
+          sessionId,
+          mode,
+          ...(attachments.length > 0 ? { attachmentCount: attachments.length } : {}),
+        })
         sendJson(res, 202, response)
         return
       }
