@@ -109,6 +109,7 @@ function verifyDesktopProfileAndMeta(): void {
       startedBundles: profile.layers.map(layer => layer.packageName),
       cwd: process.cwd(),
       home: process.env.DSH_HOME,
+      overlays: [],
       overlayPaths: [],
       telemetryDisabledEnv: '1',
     }, profile)]);
