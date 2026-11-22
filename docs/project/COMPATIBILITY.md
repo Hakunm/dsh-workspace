@@ -5,7 +5,8 @@
 | 组件 | 支持范围 | 验证方式 |
 | --- | --- | --- |
 | Node.js | `^22.19.0 || >=24.0.0` | CI 22.19 和 24 |
-| DSH | 标签 `dsh-v0.2.2-rc.5`（npm `@deepseek-ai/dsh@0.2.2-rc.5`） | tarball profile 安装、配置组合、真实启动与全量 REST/WS/WebUI 端到端验证 |
+| DSH 桌面客户端 | DeepSeek Harness Desktop `0.2.2-rc.5`（`profile=desktop`，Electron `dsh-app://app`） | 桌面内置插件管理页与 CLI `desktop` profile 安装、标题栏/拖拽区避让、原生目录选择与另存为桥接验证 |
+| DSH WebUI | 标签 `dsh-v0.2.2-rc.5`（npm `@deepseek-ai/dsh@0.2.2-rc.5`，`profile=web`） | tarball profile 安装、配置组合、真实启动与全量 REST/WS/WebUI 端到端验证 |
 | Windows | Windows Server 2022 / Windows 11 | `windows-latest` |
 | macOS | GitHub 当前 macOS runner | `macos-latest` |
 | Linux | Ubuntu 当前 LTS runner | `ubuntu-latest` |

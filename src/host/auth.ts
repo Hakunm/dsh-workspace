@@ -72,10 +72,13 @@ export function isLoopbackAddress(address: string): boolean {
   return normalized === '127.0.0.1' || normalized === '::1' || normalized === '::ffff:127.0.0.1'
 }
 
-function isLoopbackOrigin(origin: string | undefined): boolean {
+export function isLoopbackOrigin(origin: string | undefined): boolean {
   if (origin === undefined) return true
   try {
-    const hostname = new URL(origin).hostname.toLowerCase()
+    const url = new URL(origin)
+    const hostname = url.hostname.toLowerCase()
+    if (url.protocol === 'dsh-app:') return hostname === 'app' && url.port === ''
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return false
     return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]' || hostname === '::1'
   } catch {
     return false

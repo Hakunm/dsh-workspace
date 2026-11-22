@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "DSH 文件工作区",
+    "description": "为 DeepSeek Harness 桌面客户端与 WebUI 提供双语文件工作区，并为移动端提供安全远程 API。",
+    "detail": "README.md"
+  }
+}

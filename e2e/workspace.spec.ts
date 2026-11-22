@@ -70,3 +70,76 @@ test('keeps the workspace within a mobile viewport', async ({ page }) => {
   expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.viewport + 1)
   expect(metrics.workspaceHeight).toBeGreaterThan(500)
 })
+
+test('supports Desktop directory picker, native Save As bridge, in-app confirmations, and Windows titlebar clearance', async ({ page }, testInfo) => {
+  if (testInfo.project.name.includes('mobile')) return
+
+  await page.addInitScript(() => {
+    const applyWindowsTitlebar = (): void => {
+      document.documentElement.setAttribute('data-windows-titlebar', '')
+      document.documentElement.style.setProperty('--dsh-windows-titlebar-height', '40px')
+    }
+    if (document.documentElement !== null) applyWindowsTitlebar()
+    window.addEventListener('DOMContentLoaded', applyWindowsTitlebar, { once: true })
+    ;(window as unknown as Record<string, unknown>).__DSH_DIRECTORY_PICKER__ = {
+      pick: async () => 'C:\\DemoWorkspace\\SelectedByDesktopPicker',
+    }
+    ;(window as unknown as Record<string, unknown>).dshDesktop = {
+      fileActions: {
+        save: async (request: { name?: string; mode: string }) => {
+          ;(window as unknown as Record<string, unknown>).__LAST_DESKTOP_SAVE__ = {
+            name: request.name,
+            mode: request.mode,
+          }
+          return { status: 'saved', path: `C:\\Downloads\\${request.name ?? 'file'}` }
+        },
+      },
+    }
+  })
+
+  let nativeDialogTriggered = false
+  page.on('dialog', () => { nativeDialogTriggered = true })
+
+  await page.goto('/workspace')
+  await page.getByTitle('设置', { exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '工作区设置' })
+  await expect(dialog).toBeVisible()
+  const box = await dialog.boundingBox()
+  expect(box?.y ?? 0).toBeGreaterThanOrEqual(40)
+
+  const browseBtn = page.getByRole('button', { name: '选择目录…' })
+  await expect(browseBtn).toBeVisible()
+  await browseBtn.click()
+  await expect(page.getByPlaceholder('绝对目录路径')).toHaveValue('C:\\DemoWorkspace\\SelectedByDesktopPicker')
+  await expect(page.getByPlaceholder('显示名称')).toHaveValue('SelectedByDesktopPicker')
+  await page.getByTitle('关闭').click()
+
+  await page.getByTitle('新建文件', { exact: true }).click()
+  await page.getByRole('dialog', { name: '新建文件' }).locator('input').fill('desktop-temp.txt')
+  await page.getByRole('button', { name: '应用' }).click()
+  await page.getByRole('button', { name: 'desktop-temp.txt' }).click()
+
+  await page.getByTitle('下载').click()
+  await expect(page.locator('.daw-status')).toContainText('已导出 desktop-temp.txt')
+  const savedRequest = await page.evaluate(() => (window as unknown as Record<string, unknown>).__LAST_DESKTOP_SAVE__)
+  expect(savedRequest).toEqual({ name: 'desktop-temp.txt', mode: 'saveAs' })
+
+  await page.getByTitle('移入回收站').click()
+  const confirmTrash = page.getByRole('alertdialog', { name: '移入回收站' })
+  await expect(confirmTrash).toBeVisible()
+  await confirmTrash.getByRole('button', { name: '取消' }).click()
+  await expect(confirmTrash).toBeHidden()
+  await expect(page.getByRole('button', { name: 'desktop-temp.txt' })).toBeVisible()
+
+  await page.getByTitle('移入回收站').click()
+  await page.getByRole('alertdialog', { name: '移入回收站' }).getByRole('button', { name: '移入回收站' }).click()
+  await expect(page.locator('.daw-status')).toContainText('已移入回收站')
+
+  await page.getByTitle('设置', { exact: true }).click()
+  await page.getByRole('button', { name: '回收站', exact: true }).click()
+  await expect(page.getByText('desktop-temp.txt').first()).toBeVisible()
+  await page.getByTitle('永久删除').first().click()
+  await page.getByRole('alertdialog', { name: '永久删除' }).getByRole('button', { name: '永久删除' }).click()
+  await expect(page.getByText('desktop-temp.txt')).toHaveCount(0)
+  expect(nativeDialogTriggered).toBe(false)
+})

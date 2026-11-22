@@ -95,6 +95,7 @@ export class WorkspaceApi {
     configuredHost: string
     configuredPort: number
     remoteEnabled: boolean
+    fallbackCode?: string
     roots: (RootView & { realPath: string })[]
     devices: DeviceView[]
     operation?: { state: string; code?: string; message?: string; pairingCode?: string; pairingExpiresAt?: number }

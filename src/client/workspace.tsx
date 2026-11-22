@@ -1,6 +1,8 @@
 import {
+  Check,
   ChevronDown,
   ChevronRight,
+  Copy,
   Download,
   File,
   FilePlus2,
@@ -20,11 +22,18 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { DeviceScope, DeviceView, FileEntryView, RootView } from '../shared/contracts.ts'
 import { DEVICE_SCOPES } from '../shared/contracts.ts'
+import { PLUGIN_VERSION } from '../shared/version.ts'
 import { WorkspaceApi, WorkspaceApiError } from './api.ts'
+import {
+  canPickDesktopDirectory,
+  copyTextToClipboard,
+  defaultRootLabel,
+  pickDesktopDirectory,
+  saveClientFile,
+} from './desktop.ts'
 import { CodeEditor } from './editor.tsx'
 import { LanguageToggle, type MessageKey, type Translate, useWorkspaceI18n } from './i18n.tsx'
 import { installWorkspaceStyles } from './styles.ts'
-import { PLUGIN_VERSION } from '../shared/version.ts'
 
 interface OpenFile {
   path: string
@@ -65,6 +74,7 @@ export function WorkspaceApp(props: {
   const [refreshKey, setRefreshKey] = useState(0)
   const [command, setCommand] = useState<'file' | 'directory' | 'rename'>()
   const [commandValue, setCommandValue] = useState('')
+  const [pendingTrashPath, setPendingTrashPath] = useState<string>()
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<FileEntryView[]>([])
   const [searchTruncated, setSearchTruncated] = useState(false)
@@ -89,6 +99,7 @@ export function WorkspaceApp(props: {
     setSelected(undefined)
     setOpenFile(undefined)
     setCurrentDirectory('')
+    setPendingTrashPath(undefined)
     setSearchQuery('')
     setSearchResults([])
     setSearchTruncated(false)
@@ -199,19 +210,21 @@ export function WorkspaceApp(props: {
     }
   }, [command, commandValue, currentDirectory, props.api, rootId, selected])
 
-  const remove = useCallback(async () => {
-    if (rootId === '' || selected === undefined) return
-    if (!globalThis.confirm(t('trashConfirm', { path: selected.path }))) return
+  const confirmRemove = useCallback(async () => {
+    const targetPath = pendingTrashPath
+    if (rootId === '' || targetPath === undefined) return
+    setPendingTrashPath(undefined)
     try {
-      await props.api.trash(rootId, selected.path)
-      setSelected(undefined)
-      setOpenFile(undefined)
+      await props.api.trash(rootId, targetPath)
+      setSelected(current => current?.path === targetPath ? undefined : current)
+      setOpenFile(current => current?.path === targetPath ? undefined : current)
       setRefreshKey(key => key + 1)
       setStatus({ key: 'movedTrash' })
+      setError(undefined)
     } catch (cause) {
       setError(cause)
     }
-  }, [props.api, rootId, selected, t])
+  }, [pendingTrashPath, props.api, rootId])
 
   const upload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0]
@@ -221,6 +234,7 @@ export function WorkspaceApp(props: {
       await props.api.write(rootId, joinWire(currentDirectory, file.name), new Uint8Array(await file.arrayBuffer()))
       setRefreshKey(key => key + 1)
       setStatus({ key: 'uploaded', values: { name: file.name } })
+      setError(undefined)
     } catch (cause) {
       setError(cause)
     }
@@ -230,12 +244,12 @@ export function WorkspaceApp(props: {
     if (rootId === '' || openFile === undefined) return
     try {
       const content = await props.api.read(rootId, openFile.path)
-      const url = URL.createObjectURL(new Blob([content.bytes.slice().buffer as ArrayBuffer]))
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = openFile.path.split('/').at(-1) ?? 'download'
-      anchor.click()
-      URL.revokeObjectURL(url)
+      const fileName = openFile.path.split('/').at(-1) ?? 'download'
+      const outcome = await saveClientFile(fileName, content.bytes, content.contentType)
+      if (outcome !== 'cancelled') {
+        setStatus({ key: 'downloaded', values: { name: fileName } })
+      }
+      setError(undefined)
     } catch (cause) {
       setError(cause)
     }
@@ -256,7 +270,7 @@ export function WorkspaceApp(props: {
         <button className="daw-icon" title={t('upload')} disabled={rootId === ''} onClick={() => uploadRef.current?.click()}><Upload size={16} /></button>
         <input hidden type="file" ref={uploadRef} onChange={event => { void upload(event) }} />
         <button className="daw-icon hide-mobile" title={t('renameMove')} disabled={selected === undefined} onClick={() => { setCommand('rename'); setCommandValue(selected?.path.split('/').at(-1) ?? '') }}><RefreshCw size={15} /></button>
-        <button className="daw-icon hide-mobile" title={t('moveTrash')} disabled={selected === undefined} onClick={() => { void remove() }}><Trash2 size={15} /></button>
+        <button className="daw-icon hide-mobile" title={t('moveTrash')} disabled={selected === undefined} onClick={() => { if (selected !== undefined) setPendingTrashPath(selected.path) }}><Trash2 size={15} /></button>
         <span className="daw-toolbar-spacer" />
         <LanguageToggle />
         <button className="daw-icon" title={t('refresh')} onClick={() => { setRefreshKey(key => key + 1); void refreshRoots() }}><RefreshCw size={16} /></button>
@@ -338,6 +352,14 @@ export function WorkspaceApp(props: {
       onCancel={() => setCommand(undefined)}
       onSubmit={() => { void submitCommand() }}
     />}
+    {pendingTrashPath !== undefined && <ConfirmDialog
+      title={t('moveToTrashConfirmTitle')}
+      message={t('trashConfirm', { path: pendingTrashPath })}
+      confirmLabel={t('moveTrash')}
+      danger
+      onCancel={() => setPendingTrashPath(undefined)}
+      onConfirm={() => { void confirmRemove() }}
+    />}
   </div>
 }
 
@@ -410,8 +432,9 @@ function CommandDialog(props: {
   onSubmit(): void
 }): JSX.Element {
   const { t } = useWorkspaceI18n()
-  return <div className="daw-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) props.onCancel() }}>
-    <form className="daw-modal-small" onSubmit={(event) => { event.preventDefault(); props.onSubmit() }}>
+  useEscapeKey(props.onCancel)
+  return <div className="daw-overlay" data-daw-nested-dialog="true" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) props.onCancel() }}>
+    <form className="daw-modal-small" role="dialog" aria-modal="true" aria-label={props.title} onSubmit={(event) => { event.preventDefault(); props.onSubmit() }}>
       <h3>{props.title}</h3>
       <input autoFocus className="daw-input" style={{ width: '100%' }} value={props.value} onChange={event => props.onChange(event.target.value)} />
       <div className="daw-modal-actions">
@@ -419,6 +442,28 @@ function CommandDialog(props: {
         <button type="submit" className="daw-command primary">{t('apply')}</button>
       </div>
     </form>
+  </div>
+}
+
+function ConfirmDialog(props: {
+  title: string
+  message: string
+  confirmLabel: string
+  danger?: boolean
+  onCancel(): void
+  onConfirm(): void
+}): JSX.Element {
+  const { t } = useWorkspaceI18n()
+  useEscapeKey(props.onCancel)
+  return <div className="daw-overlay" data-daw-nested-dialog="true" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) props.onCancel() }}>
+    <div className="daw-modal-small" role="alertdialog" aria-modal="true" aria-label={props.title}>
+      <h3>{props.title}</h3>
+      <p className="daw-confirm-body">{props.message}</p>
+      <div className="daw-modal-actions">
+        <button type="button" autoFocus className="daw-command" onClick={props.onCancel}>{t('cancel')}</button>
+        <button type="button" className={`daw-command ${props.danger === true ? 'danger-solid' : 'primary'}`} onClick={props.onConfirm}>{props.confirmLabel}</button>
+      </div>
+    </div>
   </div>
 }
 
@@ -433,7 +478,10 @@ export function AdminOverlay(props: { api: WorkspaceApi; open: boolean; onClose(
   const [listenerHost, setListenerHost] = useState('0.0.0.0')
   const [listenerPort, setListenerPort] = useState('3090')
   const [pairing, setPairing] = useState<{ code: string; expiresAt?: number }>()
+  const [copiedCode, setCopiedCode] = useState(false)
+  const [pendingPurgeId, setPendingPurgeId] = useState<string>()
   const [error, setError] = useState<unknown>()
+  const desktopPickerAvailable = canPickDesktopDirectory()
 
   const refresh = useCallback(async () => {
     try {
@@ -453,6 +501,11 @@ export function AdminOverlay(props: { api: WorkspaceApi; open: boolean; onClose(
     setListenerHost(status.configuredHost)
     setListenerPort(String(status.configuredPort))
   }, [status?.configuredHost, status?.configuredPort])
+  useEffect(() => {
+    setCopiedCode(false)
+  }, [pairing?.code])
+  useEscapeKey(props.onClose, props.open && pendingPurgeId === undefined)
+
   if (!props.open) return null
   const roots = status?.roots ?? []
   const parsedListenerPort = Number(listenerPort)
@@ -478,6 +531,24 @@ export function AdminOverlay(props: { api: WorkspaceApi; open: boolean; onClose(
     throw new Error(t('listenerTimedOut'))
   }
 
+  const browseRootDirectory = async (): Promise<void> => {
+    try {
+      const picked = await pickDesktopDirectory()
+      if (picked === null || picked.trim() === '') return
+      setPath(picked)
+      setLabel(current => current.trim() === '' ? defaultRootLabel(picked) : current)
+      setError(undefined)
+    } catch (cause) {
+      setError(cause)
+    }
+  }
+
+  const copyPairing = async (code: string): Promise<void> => {
+    if (await copyTextToClipboard(code)) {
+      setCopiedCode(true)
+    }
+  }
+
   return <div className="daw-root daw-overlay" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) props.onClose() }}>
     <section className="daw-dialog" role="dialog" aria-modal="true" aria-label={t('workspaceSettings')}>
       <header className="daw-dialog-head"><h2>{t('workspaceSettings')}</h2><span className="daw-version" title={t('version')}>v{PLUGIN_VERSION}</span><span className="daw-toolbar-spacer" /><a href="https://github.com/Hakunm" target="_blank" rel="noreferrer" style={{ color: 'var(--daw-muted)', fontSize: 12, fontWeight: 500, textDecoration: 'none', whiteSpace: 'nowrap' }}>{t('author')}</a><LanguageToggle /><button className="daw-icon" title={t('close')} onClick={props.onClose}><X size={17} /></button></header>
@@ -489,8 +560,9 @@ export function AdminOverlay(props: { api: WorkspaceApi; open: boolean; onClose(
           {error !== undefined && <div className="daw-warning">{messageOf(error, t)}</div>}
           {tab === 'roots' && <>
             <h3>{t('authorizedRoots')}</h3>
-            <div className="daw-form-row">
+            <div className={`daw-form-row${desktopPickerAvailable ? ' with-picker' : ''}`}>
               <input className="daw-input" placeholder={t('absolutePath')} value={path} onChange={event => setPath(event.target.value)} />
+              {desktopPickerAvailable && <button type="button" className="daw-command" onClick={() => { void browseRootDirectory() }}><FolderOpen size={15} /> {t('browseDirectory')}</button>}
               <input className="daw-input" placeholder={t('displayLabel')} value={label} onChange={event => setLabel(event.target.value)} />
               <button className="daw-command primary" onClick={() => { void props.api.addRoot(path, label || undefined).then(() => { setPath(''); setLabel(''); return refresh() }).catch(setError) }}>{t('addRoot')}</button>
             </div>
@@ -499,6 +571,7 @@ export function AdminOverlay(props: { api: WorkspaceApi; open: boolean; onClose(
           {tab === 'remote' && <>
             <h3>{t('remoteAccess')}</h3>
             <div className="daw-warning">{t('httpWarning')}</div>
+            {status?.fallbackCode === 'LISTENER_ADDRESS_IN_USE' && <div className="daw-warning">{t('listenerPortFallbackHint', { configuredPort: status.configuredPort, actualPort: status.port })}</div>}
             {roots.length === 0 && <div className="daw-warning">{t('addRootBeforeRemote')}</div>}
             <div className="daw-listener-form">
               <label className="daw-field"><span>{t('bindIp')}</span><input className="daw-input" value={listenerHost} disabled={status?.remoteEnabled} spellCheck={false} placeholder="0.0.0.0" onChange={event => setListenerHost(event.target.value)} /></label>
@@ -520,7 +593,12 @@ export function AdminOverlay(props: { api: WorkspaceApi; open: boolean; onClose(
               ? <button className="daw-command danger" onClick={() => { void props.api.disableRemote().then(result => poll(result.id)).then(refresh).catch(setError) }}>{t('disableRemote')}</button>
               : <button className="daw-command primary" disabled={roots.length === 0 || listenerDirty || !listenerPortValid || listenerHost.trim() === ''} onClick={() => { void props.api.enableRemote(roots.map(root => root.id), [...DEVICE_SCOPES]).then(result => poll(result.id)).catch(setError) }}>{t('enablePairing')}</button>}
             {status?.remoteEnabled && <button className="daw-command daw-inline-command" onClick={() => { void props.api.createPairing(roots.map(root => root.id), [...DEVICE_SCOPES]).then(value => setPairing(value)).catch(setError) }}>{t('newPairingCode')}</button>}
-            {pairing !== undefined && <div className="daw-code">{pairing.code}</div>}
+            {pairing !== undefined && <div className="daw-code-wrap">
+              <span className="daw-code">{pairing.code}</span>
+              <button type="button" className="daw-command" onClick={() => { void copyPairing(pairing.code) }}>
+                {copiedCode ? <Check size={15} /> : <Copy size={15} />} {t(copiedCode ? 'copied' : 'copyPairingCode')}
+              </button>
+            </div>}
           </>}
           {tab === 'devices' && <>
             <h3>{t('pairedDevices')}</h3>
@@ -528,7 +606,7 @@ export function AdminOverlay(props: { api: WorkspaceApi; open: boolean; onClose(
           </>}
           {tab === 'trash' && <>
             <h3>{t('pluginTrash')}</h3>
-            <div className="daw-list">{trash.map(item => <div className="daw-list-row" key={item.id}><div><div className="daw-list-title">{item.path}</div><div className="daw-list-meta">{item.kind} · {formatBytes(item.size)} · {new Date(item.createdAt).toLocaleString(locale)}</div></div><div><button className="daw-command" onClick={() => { void props.api.restoreTrash(item.id).then(refresh).catch(setError) }}>{t('restore')}</button><button className="daw-icon danger" title={t('deletePermanently')} onClick={() => { if (confirm(t('purgeConfirm'))) void props.api.purgeTrash(item.id).then(refresh).catch(setError) }}><Trash2 size={15} /></button></div></div>)}</div>
+            <div className="daw-list">{trash.map(item => <div className="daw-list-row" key={item.id}><div><div className="daw-list-title">{item.path}</div><div className="daw-list-meta">{item.kind} · {formatBytes(item.size)} · {new Date(item.createdAt).toLocaleString(locale)}</div></div><div><button className="daw-command" onClick={() => { void props.api.restoreTrash(item.id).then(refresh).catch(setError) }}>{t('restore')}</button><button className="daw-icon danger" title={t('deletePermanently')} onClick={() => { setPendingPurgeId(item.id) }}><Trash2 size={15} /></button></div></div>)}</div>
           </>}
           {tab === 'audit' && <>
             <h3>{t('recentAudit')}</h3>
@@ -537,6 +615,18 @@ export function AdminOverlay(props: { api: WorkspaceApi; open: boolean; onClose(
         </main>
       </div>
     </section>
+    {pendingPurgeId !== undefined && <ConfirmDialog
+      title={t('purgeTrashConfirmTitle')}
+      message={t('purgeConfirm')}
+      confirmLabel={t('deletePermanently')}
+      danger
+      onCancel={() => setPendingPurgeId(undefined)}
+      onConfirm={() => {
+        const targetId = pendingPurgeId
+        setPendingPurgeId(undefined)
+        void props.api.purgeTrash(targetId).then(refresh).catch(setError)
+      }}
+    />}
   </div>
 }
 
@@ -567,6 +657,22 @@ function DeviceRow(props: {
       <button className="daw-icon danger" title={t('revokeDevice')} onClick={() => { void props.api.revokeDevice(props.device.id).then(props.onChanged).catch(props.onError) }}><Trash2 size={15} /></button>
     </div>}
   </div>
+}
+
+export function useEscapeKey(onEscape: () => void, enabled = true): void {
+  const callbackRef = useRef(onEscape)
+  callbackRef.current = onEscape
+  useEffect(() => {
+    if (!enabled || typeof window === 'undefined') return
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      event.preventDefault()
+      event.stopPropagation()
+      callbackRef.current()
+    }
+    window.addEventListener('keydown', handleKeyDown, true)
+    return () => { window.removeEventListener('keydown', handleKeyDown, true) }
+  }, [enabled])
 }
 
 function decodeText(bytes: Uint8Array): { text: string; bom: boolean; newline: '\n' | '\r\n'; binary: boolean } {

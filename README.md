@@ -1,7 +1,7 @@
 # dsh-workspace
 
 <p align="center">
-  <strong>把文件工作区直接带进 DeepSeek Harness WebUI，并为手机和第三方客户端提供稳定的远程接口。</strong>
+  <strong>把文件工作区直接带进 DeepSeek Harness 桌面客户端与 WebUI，并为手机和第三方客户端提供稳定的远程接口。</strong>
 </p>
 
 <p align="center">
@@ -9,15 +9,15 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-v1.2.0-087f8c">
+  <img alt="Version" src="https://img.shields.io/badge/version-v1.3.0-087f8c">
   <img alt="DSH" src="https://img.shields.io/badge/DeepSeek_Harness-0.2.2--rc.5-1f2328">
   <img alt="Platforms" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-586069">
   <img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-2da44e">
 </p>
 
-`dsh-workspace` 是 DeepSeek Harness（DSH）的 WebUI 文件工作区与远程访问插件。安装后，你可以留在 DSH WebUI 里浏览、搜索、编辑和整理本机文件，也可以让 [dsh-android-app](https://github.com/Hakunm/dsh-android-app) 通过版本化 API 连接同一套聊天、工作区、审批、提问和文件能力。
+`dsh-workspace` 是 DeepSeek Harness（DSH）的文件工作区与远程访问插件，同时支持 DSH 桌面客户端与 DSH WebUI。安装后，你可以留在 DSH 窗口里浏览、搜索、编辑和整理本机文件，也可以让 [dsh-android-app](https://github.com/Hakunm/dsh-android-app) 通过版本化 API 连接同一套聊天、工作区、审批、提问和文件能力。
 
-界面默认中文，可随时切换 English，并自动跟随 DSH WebUI 的浅色 / 深色主题。插件支持 Windows、macOS 和 Linux，安装包已经包含编译产物，不要求用户在服务器上重新构建。
+界面默认中文，可随时切换 English，并自动跟随 DSH 的浅色 / 深色主题。插件支持 Windows、macOS 和 Linux，安装包已经包含编译产物，无需在目标机器上重新构建。
 
 ## 实际效果
 
@@ -31,7 +31,29 @@
 
 ## 快速安装
 
-### 环境要求
+### 在 DSH 桌面客户端安装
+
+- 已安装并至少启动过一次 DeepSeek Harness 桌面客户端（推荐 `0.2.2-rc.5` 及以上）
+
+**方式一：桌面客户端内直接安装（推荐）**
+
+打开 DeepSeek Harness 桌面客户端，进入左侧栏 **插件** 页面，点击 **添加插件**，填入 Release 安装包地址（或选择已下载到本地的 `.tgz` 文件绝对路径）：
+
+```text
+https://github.com/Hakunm/dsh-workspace/releases/download/v1.3.0/dsh-workspace-1.3.0.tgz
+```
+
+桌面客户端会使用内置运行时自动完成安装与启用，无需单独安装 Node.js 或 `pnpm`。安装完成后，侧栏会出现“文件”入口，插件详情页与会话视图中也会提供快捷入口。
+
+**方式二：命令行安装到 `desktop` profile**
+
+完全退出桌面客户端后执行：
+
+```sh
+dsh plugin --profile desktop add https://github.com/Hakunm/dsh-workspace/releases/download/v1.3.0/dsh-workspace-1.3.0.tgz
+```
+
+### 在 DSH WebUI 安装
 
 - 已安装并能正常启动的 DeepSeek Harness WebUI（推荐 `0.2.2-rc.5` 及以上）
 - Node.js `^22.19.0` 或 `>=24.0.0`
@@ -40,25 +62,25 @@
 使用运行 DSH WebUI 的同一系统用户执行：
 
 ```sh
-dsh plugin --profile web add https://github.com/Hakunm/dsh-workspace/releases/download/v1.2.0/dsh-workspace-1.2.0.tgz
+dsh plugin --profile web add https://github.com/Hakunm/dsh-workspace/releases/download/v1.3.0/dsh-workspace-1.3.0.tgz
 npx @deepseek-ai/dsh web
 ```
 
 重启 WebUI 后，侧栏会出现“文件”入口，会话视图中也会出现文件标签页。
 
-从 GitHub Release 下载离线安装包时，可直接安装 tarball：
+从 GitHub Release 下载离线安装包时，可直接安装本地 tarball：
 
 ```sh
-dsh plugin --profile web add ./dsh-workspace-1.2.0.tgz
+dsh plugin --profile web add ./dsh-workspace-1.3.0.tgz
 ```
 
 ## 第一次使用
 
-1. 在 DSH WebUI 中打开“文件”，点击右上角的“工作区设置”。
-2. 在“根目录”页添加允许管理的本机目录，并为它起一个容易识别的名字。
+1. 在 DSH 桌面客户端或 WebUI 中打开“文件”，点击右上角的“工作区设置”。
+2. 在“根目录”页添加允许管理的本机目录（桌面客户端可直接点击“选择目录…”调用系统文件夹选择器），并为它起一个容易识别的名字。
 3. 返回文件工作区，选择授权根后即可浏览、搜索和编辑文件。
 4. 需要连接手机时，进入“远程访问”，填写绑定 IP 和端口并保存。
-5. 点击“启用并创建配对”，再将十分钟内有效的一次性配对码填入 App。
+5. 点击“启用并创建配对”，复制十分钟内有效的一次性配对码填入 App。
 
 远程访问只有在至少存在一个授权根时才能开启。安装插件本身不会把服务暴露到局域网，未启用时只监听回环地址。
 
@@ -184,9 +206,13 @@ Authorization: Bearer DEVICE_TOKEN
 
 ## 升级与卸载
 
-升级前建议先停止 DSH WebUI，再安装新版本并重新启动。卸载命令：
+桌面客户端可直接在左侧栏“插件”页面中更新或卸载；使用命令行升级或卸载前请先完全退出桌面客户端或停止 DSH WebUI：
 
 ```sh
+# 桌面客户端
+dsh plugin --profile desktop remove dsh-workspace
+
+# WebUI
 dsh plugin --profile web remove dsh-workspace
 ```
 
@@ -196,15 +222,15 @@ dsh plugin --profile web remove dsh-workspace
 
 **安装后看不到“文件”入口**
 
-确认插件安装在 `web` profile，并在安装后重启 DSH WebUI；同时确认使用的是 `v1.2.0`（适配 DSH `0.2.2-rc.5` 的 `@deepseek-ai/dsh-client-ui-renderer` 客户端入口）。
+确认插件已安装到当前运行的 profile（桌面客户端为 `desktop`，命令行 WebUI 为 `web`）并处于启用状态；若通过命令行安装，请重启对应客户端。
 
 **“启用并创建配对”按钮不可用**
 
-先添加至少一个授权根。如果刚修改过绑定 IP 或端口，还需要先保存监听设置。
+先添加至少一个授权根。如果刚修改过绑定 IP 或端口，还需要先保存监听设置。若同一台电脑同时运行了 DSH WebUI 与桌面客户端导致默认 `3090` 端口被占用，可在当前窗口将端口改为其他空闲端口后保存启用。
 
 **手机无法连接**
 
-检查远程访问是否已启用，服务器防火墙和云安全组是否放行端口，以及 App 中填写的地址是否能从手机到达。不要填写服务器自己的 `127.0.0.1`。
+检查远程访问是否已启用，本机或服务器防火墙与云安全组是否放行端口，以及 App 中填写的地址是否能从手机到达。不要填写主机自己的 `127.0.0.1`。
 
 **保存文件时提示冲突**
 
@@ -218,11 +244,11 @@ pnpm check
 pnpm pack
 ```
 
-v1.2.0 基于 DSH `dsh-v0.2.2-rc.5`（npm `@deepseek-ai/dsh@0.2.2-rc.5`）适配并完成真实端到端验证，CI 覆盖 Windows、Ubuntu 和 macOS。
+v1.3.0 基于 DSH `dsh-v0.2.2-rc.5`（桌面客户端与 `@deepseek-ai/dsh@0.2.2-rc.5`）完成验证，CI 覆盖 Windows、Ubuntu 和 macOS。
 
 ## 项目信息
 
-- 当前版本：`v1.2.0`
+- 当前版本：`v1.3.0`
 - 作者：[Github@Hakunm](https://github.com/Hakunm)
 - 许可证：[GNU Affero General Public License v3.0](./LICENSE)
 - Android 客户端：[dsh-android-app](https://github.com/Hakunm/dsh-android-app)

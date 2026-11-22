@@ -22,6 +22,7 @@ interface RemoteApiServerOptions {
   chat: DshChatAdapter
   events: WorkspaceEventBus
   handle: (req: IncomingMessage, res: ServerResponse) => Promise<void>
+  onFallback?: (message: string) => void
 }
 
 interface OperationState extends RemoteOperationView {
@@ -40,6 +41,7 @@ export class RemoteApiServer implements RemoteControl {
   private configuredHost: string
   private configuredPort: number
   private remoteEnabled = false
+  private fallbackCode: string | undefined
   private readonly operations = new Map<string, OperationState>()
   private readonly sockets = new Map<WebSocket, Principal>()
   private readonly webSockets = new WebSocketServer({ noServer: true, clientTracking: false })
@@ -58,14 +60,37 @@ export class RemoteApiServer implements RemoteControl {
 
   async start(): Promise<void> {
     this.remoteEnabled = this.options.database.getSetting('remote_enabled') === 'true'
-    const requestedHost = this.remoteEnabled ? this.configuredHost : loopbackFor(this.configuredHost)
+    this.fallbackCode = undefined
+    const loopbackHost = loopbackFor(this.configuredHost)
+    const requestedHost = this.remoteEnabled ? this.configuredHost : loopbackHost
     try {
       await this.bind(requestedHost, this.configuredPort)
     } catch (error) {
-      if (!this.remoteEnabled) throw error
-      this.remoteEnabled = false
-      this.options.database.setSetting('remote_enabled', 'false')
-      await this.bind(loopbackFor(this.configuredHost), this.configuredPort)
+      const code = listenerErrorCode(error)
+      if (code === 'LISTENER_ADDRESS_IN_USE') {
+        this.remoteEnabled = false
+        this.fallbackCode = code
+        await this.bind(loopbackHost, 0)
+        this.options.onFallback?.(
+          `listener ${requestedHost}:${this.configuredPort} is already in use; using loopback ${this.host}:${this.actualPort} for this instance`,
+        )
+      } else if (this.remoteEnabled) {
+        this.remoteEnabled = false
+        this.fallbackCode = code
+        this.options.database.setSetting('remote_enabled', 'false')
+        try {
+          await this.bind(loopbackHost, this.configuredPort)
+        } catch (fallbackError) {
+          if (listenerErrorCode(fallbackError) !== 'LISTENER_ADDRESS_IN_USE') throw fallbackError
+          this.fallbackCode = 'LISTENER_ADDRESS_IN_USE'
+          await this.bind(loopbackHost, 0)
+        }
+        this.options.onFallback?.(
+          `remote listener ${requestedHost}:${this.configuredPort} failed (${code}); fell back to loopback ${this.host}:${this.actualPort}`,
+        )
+      } else {
+        throw error
+      }
     }
     this.unsubscribeEvents = this.options.events.subscribe(event => {
       this.broadcastQueue = this.broadcastQueue.then(() => this.broadcast(event)).catch(() => undefined)
@@ -90,6 +115,7 @@ export class RemoteApiServer implements RemoteControl {
       configuredHost: this.configuredHost,
       configuredPort: this.configuredPort,
       remoteEnabled: this.remoteEnabled,
+      ...(this.fallbackCode === undefined ? {} : { fallbackCode: this.fallbackCode }),
       ...(operation === undefined ? {} : { operation: publicOperation(operation) }),
     }
   }
@@ -203,6 +229,7 @@ export class RemoteApiServer implements RemoteControl {
         this.options.database.setSetting('listener_port', String(this.configuredPort))
       }
       this.remoteEnabled = operation.nextRemoteEnabled
+      this.fallbackCode = undefined
       this.options.database.setSetting('remote_enabled', String(this.remoteEnabled))
       if (this.remoteEnabled) {
         const pairing = this.options.database.createPairing(operation.rootIds ?? [], operation.scopes ?? [])

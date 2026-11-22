@@ -1,4 +1,5 @@
-# Install this layer with:
+# Install this layer in DSH Desktop (Plugins page) or via CLI:
+# dsh plugin --profile desktop add dsh-workspace
 # dsh plugin --profile web add dsh-workspace
 - insert:
     - id: dsh-workspace

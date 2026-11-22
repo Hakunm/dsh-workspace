@@ -193,7 +193,7 @@ describe('remote HTTP API', () => {
       await remote.start()
       const baseUrl = `http://127.0.0.1:${remote.status().port}/api/v1`
       const health = await (await fetch(`${baseUrl}/healthz`)).json() as { pluginVersion: string; capabilities: string[] }
-      expect(health.pluginVersion).toBe('1.2.0')
+      expect(health.pluginVersion).toBe('1.3.0')
       expect(health.capabilities).toEqual(expect.arrayContaining([
         'streaming',
         'permissions',

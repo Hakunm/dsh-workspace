@@ -1,7 +1,7 @@
 # dsh-workspace
 
 <p align="center">
-  <strong>A file workspace inside DeepSeek Harness WebUI, plus a stable remote API for mobile and third-party clients.</strong>
+  <strong>A file workspace inside DeepSeek Harness Desktop and WebUI, plus a stable remote API for mobile and third-party clients.</strong>
 </p>
 
 <p align="center">
@@ -9,15 +9,15 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-v1.2.0-087f8c">
+  <img alt="Version" src="https://img.shields.io/badge/version-v1.3.0-087f8c">
   <img alt="DSH" src="https://img.shields.io/badge/DeepSeek_Harness-0.2.2--rc.5-1f2328">
   <img alt="Platforms" src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-586069">
   <img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-2da44e">
 </p>
 
-`dsh-workspace` adds a practical file workspace directly to DeepSeek Harness (DSH) WebUI. It also exposes a versioned API used by [dsh-android-app](https://github.com/Hakunm/dsh-android-app) and other trusted clients for chat, workspace, file, model, command, approval, and interactive user-question workflows.
+`dsh-workspace` adds a practical file workspace directly to DeepSeek Harness (DSH) Desktop and WebUI. It also exposes a versioned API used by [dsh-android-app](https://github.com/Hakunm/dsh-android-app) and other trusted clients for chat, workspace, file, model, command, approval, and interactive user-question workflows.
 
-The interface is bilingual (Chinese default, switchable to English) and automatically follows DSH WebUI light/dark appearance. Prebuilt packages run on Windows, macOS, and Linux without compiling on the target server.
+The interface is bilingual (Chinese default, switchable to English) and automatically follows DSH light/dark appearance. Prebuilt packages run on Windows, macOS, and Linux without compiling on the target machine.
 
 ## Screenshots
 
@@ -31,7 +31,29 @@ Remote access remains disabled until a local administrator chooses a bind addres
 
 ## Quick install
 
-### Requirements
+### DeepSeek Harness Desktop
+
+- DeepSeek Harness Desktop (`0.2.2-rc.5` or newer recommended), launched at least once
+
+**Option 1: Install from the Desktop Plugins page (recommended)**
+
+Open DeepSeek Harness Desktop, select **Plugins** in the left sidebar, click **Add plugin**, and enter the release tarball URL (or the absolute path to a downloaded `.tgz` file):
+
+```text
+https://github.com/Hakunm/dsh-workspace/releases/download/v1.3.0/dsh-workspace-1.3.0.tgz
+```
+
+Desktop installs and activates the bundle using its built-in runtime—no separate Node.js or `pnpm` installation is required. Once enabled, **Files** appears in the sidebar and quick actions appear on the plugin detail page and conversation tabs.
+
+**Option 2: Install via CLI into the `desktop` profile**
+
+Quit DeepSeek Harness Desktop completely, then run:
+
+```sh
+dsh plugin --profile desktop add https://github.com/Hakunm/dsh-workspace/releases/download/v1.3.0/dsh-workspace-1.3.0.tgz
+```
+
+### DeepSeek Harness WebUI
 
 - A working DeepSeek Harness WebUI installation (`0.2.2-rc.5` or newer recommended)
 - Node.js `^22.19.0` or `>=24.0.0`
@@ -40,7 +62,7 @@ Remote access remains disabled until a local administrator chooses a bind addres
 Run as the same operating-system user that runs DSH WebUI:
 
 ```sh
-dsh plugin --profile web add https://github.com/Hakunm/dsh-workspace/releases/download/v1.2.0/dsh-workspace-1.2.0.tgz
+dsh plugin --profile web add https://github.com/Hakunm/dsh-workspace/releases/download/v1.3.0/dsh-workspace-1.3.0.tgz
 npx @deepseek-ai/dsh web
 ```
 
@@ -49,16 +71,16 @@ Restart WebUI after installation. A **Files** entry appears in the sidebar, and 
 To install a downloaded release archive:
 
 ```sh
-dsh plugin --profile web add ./dsh-workspace-1.2.0.tgz
+dsh plugin --profile web add ./dsh-workspace-1.3.0.tgz
 ```
 
 ## First connection
 
-1. Open **Files** in DSH WebUI and select **Workspace settings**.
-2. Add a local directory under **Roots** and give it a recognizable label.
+1. Open **Files** in DSH Desktop or WebUI and select **Workspace settings**.
+2. Add a local directory under **Roots** (in Desktop, click **Browse…** to open the native folder chooser) and give it a recognizable label.
 3. Return to the workspace and select that root to browse, search, or edit files.
 4. For mobile access, open **Remote access**, enter the bind IP and port, and save them.
-5. Select **Enable and create pairing**, then enter the ten-minute one-time code in the app.
+5. Select **Enable and create pairing**, then copy the ten-minute one-time code into the app.
 
 Remote access cannot be enabled before at least one root exists. Installing the plugin does not expose it to the LAN; it listens on loopback until a local administrator enables remote access.
 
@@ -182,9 +204,13 @@ A device also needs an explicit grant for every `rootId`. Local administrators m
 
 ## Upgrade and uninstall
 
-Stop DSH WebUI before upgrading, install the new package, then restart it. To uninstall:
+In DSH Desktop, you can update or uninstall the plugin directly from the **Plugins** page in the sidebar. For CLI upgrades or removal, quit Desktop or stop DSH WebUI first:
 
 ```sh
+# Desktop client
+dsh plugin --profile desktop remove dsh-workspace
+
+# WebUI
 dsh plugin --profile web remove dsh-workspace
 ```
 
@@ -194,15 +220,15 @@ State is stored under `dsh-workspace` in the active `DSH_HOME`. Uninstalling doe
 
 **The Files entry is missing**
 
-Make sure the plugin was installed into the `web` profile, restart DSH WebUI, and verify you are using `v1.2.0` (which uses DSH `0.2.2-rc.5`'s `@deepseek-ai/dsh-client-ui-renderer` client injection).
+Make sure the plugin is installed and enabled in the active profile (`desktop` for DeepSeek Harness Desktop, `web` for CLI WebUI). If installed from the CLI, restart the corresponding application.
 
 **Enable and create pairing is disabled**
 
-Add at least one root. If the bind IP or port changed, save the listener settings first.
+Add at least one root. If the bind IP or port changed, save the listener settings first. If both DSH WebUI and Desktop are running on the same machine and port `3090` is already bound, pick another free port and save before enabling remote access.
 
 **The phone cannot connect**
 
-Confirm remote access is enabled, the firewall/security group allows the port, and the address is reachable from the phone. Do not use the server's own `127.0.0.1` address.
+Confirm remote access is enabled, the firewall/security group allows the port, and the address is reachable from the phone. Do not use the host's own `127.0.0.1` address.
 
 **A save reports a conflict**
 
@@ -216,11 +242,11 @@ pnpm check
 pnpm pack
 ```
 
-v1.2.0 was developed and verified end-to-end against DSH `dsh-v0.2.2-rc.5` (npm `@deepseek-ai/dsh@0.2.2-rc.5`). CI covers Windows, Ubuntu, and macOS.
+v1.3.0 was verified end-to-end against DSH `dsh-v0.2.2-rc.5` (both Desktop and `@deepseek-ai/dsh@0.2.2-rc.5`). CI covers Windows, Ubuntu, and macOS.
 
 ## Project
 
-- Version: `v1.2.0`
+- Version: `v1.3.0`
 - Author: [Github@Hakunm](https://github.com/Hakunm)
 - License: [GNU Affero General Public License v3.0](./LICENSE)
 - Android client: [dsh-android-app](https://github.com/Hakunm/dsh-android-app)

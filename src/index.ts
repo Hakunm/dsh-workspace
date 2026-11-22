@@ -1,3 +1,4 @@
+import os from 'node:os'
 import path from 'node:path'
 import { AuthService } from './host/auth.ts'
 import { DshChatAdapter } from './host/chat-adapter.ts'
@@ -41,8 +42,16 @@ interface HostContext extends HostDshServices {
   get?<T = unknown>(name: string): T | undefined
 }
 
+export function resolveDefaultDataDir(env: NodeJS.ProcessEnv = process.env): string {
+  const configuredHome = env.DSH_HOME?.trim()
+  const dshHome = configuredHome !== undefined && configuredHome !== ''
+    ? path.resolve(configuredHome)
+    : path.join(os.homedir(), '.dsh')
+  return path.join(dshHome, 'dsh-workspace')
+}
+
 export async function apply(ctx: HostContext, config: Config = {}): Promise<void> {
-  const dataDir = path.resolve(config.dataDir ?? path.join(process.cwd(), '.dsh-workspace'))
+  const dataDir = path.resolve(config.dataDir ?? resolveDefaultDataDir())
   const port = normalizeListenerPort(config.port ?? 3090, true)
   const remoteHost = normalizeListenerHost(config.remoteHost ?? DEFAULT_REMOTE_HOST)
   const maxUploadBytes = config.maxUploadBytes ?? 20 * 1024 * 1024
@@ -64,6 +73,7 @@ export async function apply(ctx: HostContext, config: Config = {}): Promise<void
     chat,
     events,
     handle: (req, res) => router.handle(req, res),
+    onFallback: message => ctx.logger.warn(new Error(`dsh-workspace: ${message}`)),
   })
   router = new ApiRouter({ database, auth, files, chat, settings, remote, maxUploadBytes })
 

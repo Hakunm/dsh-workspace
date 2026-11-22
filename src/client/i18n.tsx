@@ -112,6 +112,14 @@ const zh = {
   searching: '正在搜索…',
   noSearchResults: '未找到匹配的文件或目录',
   searchTruncated: '仅显示前 {count} 条匹配结果',
+  browseDirectory: '选择目录…',
+  confirm: '确认',
+  moveToTrashConfirmTitle: '移入回收站',
+  purgeTrashConfirmTitle: '永久删除',
+  copyPairingCode: '复制配对码',
+  copied: '已复制',
+  downloaded: '已导出 {name}',
+  listenerPortFallbackHint: '默认端口 {configuredPort} 已被本机其他实例占用，当前窗口已自动回退到本机端口 {actualPort}；应用内文件工作区不受影响。如需在本窗口开启远程访问，请更换空闲端口并保存。',
 } as const
 
 export type MessageKey = keyof typeof zh
@@ -224,6 +232,14 @@ const en: Messages = {
   searching: 'Searching…',
   noSearchResults: 'No matching files or folders',
   searchTruncated: 'Showing first {count} matches',
+  browseDirectory: 'Browse…',
+  confirm: 'Confirm',
+  moveToTrashConfirmTitle: 'Move to trash',
+  purgeTrashConfirmTitle: 'Delete permanently',
+  copyPairingCode: 'Copy code',
+  copied: 'Copied',
+  downloaded: 'Downloaded {name}',
+  listenerPortFallbackHint: 'Port {configuredPort} is already in use by another local instance, so this window fell back to local port {actualPort}; embedded workspace features remain available. Choose a free port and save to enable remote access here.',
 }
 
 const dictionaries: Record<WorkspaceLocale, Messages> = { 'zh-CN': zh, en }

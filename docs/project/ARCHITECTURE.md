@@ -23,13 +23,13 @@ flowchart LR
 
 Web Client 使用独立的外部语言 store 跨多个 DSH slot React 根同步界面语言，默认值为 `zh-CN`。语言按钮切换 `zh-CN`/`en` 并写入浏览器存储；slot 注册会随语言变化刷新标签，独立工作区同时更新文档标题和 `lang` 属性。样式表通过引用计数注入并在 `ctx.effect` 中随插件卸载清理，同时响应 DSH `body[data-ds-dark-theme]` 深色模式和独立页系统配色。
 
-`sidebar.footer.action` 是桌面端主要入口，触发 `shell.overlay` 中的完整文件树（含防抖文件名递归搜索）、CodeMirror 6 编辑器（支持 `Ctrl/Cmd+S` 保存且保留光标与撤销栈），不改变 DSH 页面 URL。overlay 使用 `closed/workspace/settings` 状态机；从工作区打开设置时仅隐藏而不卸载编辑器，关闭设置后保留目录、当前文件和未保存文本。`conversation.view` 保留会话内文件标签，`/dsh-workspace` 仅作为移动 WebView、直接链接和故障排查入口。
+`sidebar.footer.action` 是桌面客户端与 WebUI 的主要入口，触发通过 `createPortal(..., document.body)` 挂载的完整文件树（含防抖文件名递归搜索）与 CodeMirror 6 编辑器（支持 `Ctrl/Cmd+S` 保存且保留光标与撤销栈），同时向 DSH 插件管理详情页（`plugins.detail.actions`）提供快捷入口。overlay 使用 `closed/workspace/settings` 状态机，避让 Windows `data-windows-titlebar` 40px 标题栏遮罩与 macOS `data-platform="darwin"` 48px 交通灯及 `[data-window-drag]` 窗口拖拽区；在 DSH 桌面客户端中自动接入 `window.__DSH_DIRECTORY_PICKER__` 原生目录选择与 `window.dshDesktop.fileActions` 原生另存为，所有危险操作使用应用内确认弹窗而非阻塞式 `window.confirm`。`conversation.view` 保留会话内文件标签，`/dsh-workspace` 仅作为移动 WebView、直接链接和故障排查入口。
 
 ## 数据流
 
-- 本机 DSH WebUI 通过同源嵌入 route 调用管理和文件能力；Host 使用原始 socket 地址验证回环来源。
+- 本机 DSH 桌面客户端（`dsh-app://app` 自定义协议经主进程转发并附带 `dsh-desktop-session` 凭据）与 DSH WebUI 通过同源嵌入 route 调用管理和文件能力；Host 使用原始 socket 地址与本机/桌面协议 Origin 校验回环来源。
 - 外部客户端连接独立 listener。除健康检查和配对交换外，所有请求都需要设备 Bearer token。
-- listener 在 SQLite 中持久化远程绑定 IP 和端口；关闭状态绑定同地址族回环，启用状态绑定配置地址。所有重绑定先保留旧 endpoint，失败时恢复旧 endpoint 后再报告错误。
+- listener 在 SQLite 中持久化远程绑定 IP 和端口；关闭状态绑定同地址族回环，启用状态绑定配置地址。若启动时配置端口已被本机另一实例（例如同时运行 `dsh web` 与桌面客户端）占用，当前实例自动回退到临时回环端口而不阻塞宿主启动或覆写共享 SQLite 中的 `remote_enabled`。所有运行期重绑定先保留旧 endpoint，失败时恢复旧 endpoint 后再报告错误。
 - Router 先解析 principal，再检查 scope 和 root grant，最后把 `rootId + relativePath` 交给文件服务。
 - 聊天 adapter 通过 Host 桥接层调用 DSH 0.2 的 `sessionController`、`workspaceController` 与 `agentPresets` 处理会话、工作区、模型与消息，并用 `ctx.agents + ctx.commands` 列出/执行 host 斜杠命令；它不转发或依赖 DSH 私有 `/api` HTTP wire。冷会话通过模型查询取得 host agent 后再访问命令注册表。命令执行前仍执行 session/root 授权和当前命令列表校验，且绝不改走模型 prompt。会话创建优先使用 DSH `workspaceId`；工作区发现先读取 `workspace.list`，再按设备授权根过滤并把真实路径改写为 `rootId + relativePath`。新工作区登记先通过文件授权边界解析现有目录，再调用 `workspace.create`。Agent 模式来自 `agentPreset.list`；`agentPreset.select` 只为仍为 `blank` 的授权会话开放，宿主在执行时再次检查以避免首条消息与切换竞态。
 - 审批与用户提问由 `approval/request` 与 `user-questions/request` waterfall（`{ prepend: true }`）驱动：桥接层向移动端广播事件的同时并行调用 `next()`，让移动端与 DSH WebUI 自由竞态、互不阻塞；先落锤的一方触发 `approval/resolved` / `question/resolved` 清理另一端状态，并支持 DSH 0.2.2 定时问题进入 `continued` 状态后的 `userQuestions.answer(...)` 回填。

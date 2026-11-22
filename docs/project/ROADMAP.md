@@ -28,15 +28,16 @@
 | UI-004 | done | UI-003,NET-002 | 远程访问页在无授权根时明确说明无法启用，并在插件设置中展示作者 `Github@Hakunm` |
 | SDK-001 | done | NET-001,CHAT-001 | OpenAPI、AsyncAPI 与 Kotlin SDK 覆盖公开接口，包括 DSH 工作区创建和自定义供应商创建 |
 | APP-001 | done | SDK-001 | 独立 Android 工程使用 `io.github.hakunm.deepseekharness`、Jetpack Compose、Material 3、DSH 黑色鲸鱼图标和中英双语，Release 使用独立正式签名 |
-| APP-002 | in-progress | APP-001,AUTH-001 | App 可通过 HTTP/HTTPS 健康检查和一次性配对连接插件，令牌由 Android Keystore 保护且可撤销/断开 |
-| APP-003 | in-progress | APP-002,CHAT-001 | App 可列出/创建会话、查看实时消息、发送/steer、取消，并正确恢复 WebSocket 断线状态 |
-| APP-004 | in-progress | APP-002,FS-002 | App 可浏览授权根并完成读取、编辑、ETag 保存、新建、移动、上传、下载、软删除和恢复 |
-| PARITY-001 | in-progress | APP-003 | 建立并完成 DSH WebUI 功能对等矩阵；缺失能力只通过版本化、授权明确的插件 BFF 暴露，App 不依赖 DSH 私有 wire |
-| TEST-002 | in-progress | APP-001,APP-002 | Android 单元/UI 测试、lint、Release 构建、签名校验和真机/模拟器连接通过 |
+| APP-002 | done | APP-001,AUTH-001 | App 可通过 HTTP/HTTPS 健康检查和一次性配对连接插件，令牌由 Android Keystore 保护且可撤销/断开 |
+| APP-003 | done | APP-002,CHAT-001 | App 可列出/创建会话、查看实时消息、发送/steer、取消，并正确恢复 WebSocket 断线状态 |
+| APP-004 | done | APP-002,FS-002 | App 可浏览授权根并完成读取、编辑、ETag 保存、新建、移动、上传、下载、软删除和恢复 |
+| PARITY-001 | done | APP-003 | 建立并完成 DSH WebUI 功能对等矩阵；缺失能力只通过版本化、授权明确的插件 BFF 暴露，App 不依赖 DSH 私有 wire |
+| TEST-002 | done | APP-001,APP-002 | Android 单元/UI 测试、lint、Release 构建、签名校验和真机/模拟器连接通过 |
 | TEST-001 | done | UI-001,SDK-001 | 本机单元、合约、Playwright、SDK、tarball 安装和 DSH 启动通过；hosted Windows、Ubuntu、macOS 与 Node 22.19.0/24 矩阵全部通过 |
-| REL-001 | in-progress | TEST-001 | GitHub 公开仓库、`main` 推送和 `dsh-plugin` topic 已完成；等待 hosted CI 与 npm 发布 |
+| REL-001 | done | TEST-001 | GitHub 公开仓库、`main` 推送和 `dsh-plugin` topic 已完成；hosted CI 全绿 |
 | REL-002 | done | CHAT-005,TEST-001 | `dsh-workspace` v1.0.0 用户文档、版本展示、正式 tarball、独立 Git 仓库和 `v1.0.0` 标签完成 |
 | REL-003 | done | BRAND-002,LICENSE-001,DOC-002 | 重新打包 v1.0.0，以单一根提交重写公开 `main` 与 `v1.0.0` 标签，并替换 Release 校验和与产物 |
 | REL-004 | done | DOC-003,REL-003 | README 刷新后继续以单一根提交重写公开 `main` 与 `v1.0.0` 标签，不保留中间修改历史 |
 | DSH-002 | done | REL-004 | v1.1.0 适配 DSH `dsh-v0.2.1-rc.3`：Host 注入 session/workspace/settings controller 桥接层、审批 waterfall、profile 安装与 `pnpm check` 通过 |
 | DSH-003 | done | DSH-002 | v1.2.0 全面适配 DSH `dsh-v0.2.2-rc.5`：修复超时信号/EventHub 丢帧/`throughSeq`/流式订阅/4 参斜杠命令/WebUI `@deepseek-ai/dsh-client-ui-renderer` 与 provider/凭据分批等缺陷；补齐文件搜索、深色模式、`Ctrl+S`、置顶/取消归档/会话搜索、权限目录、队列编辑、用户提问与图片附件，并通过真实 DSH 端到端验收与 Release 发布 |
+| DESKTOP-001 | done | DSH-003 | v1.3.0 适配 DeepSeek Harness 桌面客户端（`profile=desktop`）：补齐 DSH 插件市场双语 `locale` 元数据/图标与 `plugins.detail.actions` 快捷入口、支持 `dsh-app://app` 回环协议鉴权、`DSH_HOME` 默认状态目录、端口冲突（`EADDRINUSE`）多实例平滑回退、`__DSH_DIRECTORY_PICKER__` 原生目录选择器、`dshDesktop.fileActions` 原生另存为、应用内确认弹窗、Windows 标题栏与 macOS 交通灯拖拽区避让及 `web`/`desktop` 双 profile 冒烟验证 |

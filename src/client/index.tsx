@@ -1,5 +1,6 @@
-import { FolderCode, X } from 'lucide-react'
+import { FolderCode, Settings, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { WorkspaceApi } from './api.ts'
 import { getWorkspaceLocale, subscribeWorkspaceLocale, translate, useWorkspaceI18n } from './i18n.tsx'
 import { installWorkspaceStyles } from './styles.ts'
@@ -10,6 +11,16 @@ interface ClientContext {
   slots: {
     inject(name: string, register: () => (() => void)): () => void
     register(options: Record<string, unknown>, component: (props: any) => JSX.Element | null): () => void
+  }
+}
+
+interface PluginDetailSlotProps {
+  subject?: {
+    kind?: string
+    pkg?: {
+      name?: string
+      enabled?: boolean
+    }
   }
 }
 
@@ -29,6 +40,13 @@ export function apply(ctx: ClientContext): void {
     name: 'sidebar.footer.action', id: 'dsh-workspace-open', order: 80,
   }, SidebarAction), 'dsh workspace sidebar action')
 
+  ctx.effect(() => ctx.slots.inject('plugins.detail.actions', () => ctx.slots.register({
+    name: 'plugins.detail.actions',
+    id: 'dsh-workspace-detail-actions',
+    order: 20,
+    label: () => translate(getWorkspaceLocale(), 'appName'),
+  }, PluginDetailActions)), 'dsh workspace plugin detail actions')
+
   ctx.effect(() => ctx.slots.inject('shell.overlay', () => ctx.slots.register({
     name: 'shell.overlay',
     id: 'dsh-workspace-overlay',
@@ -42,9 +60,31 @@ function FileConversationView(): JSX.Element {
 
 function SidebarAction(props: { wide?: boolean }): JSX.Element {
   const { t } = useWorkspaceI18n()
-  return <button className={props.wide === true ? 'daw-command' : 'daw-icon'} title={t('openWorkspace')} onClick={openWorkspace}>
-    <FolderCode size={17} />{props.wide === true && <span>{t('files')}</span>}
+  return <button
+    type="button"
+    className={`daw-sidebar-trigger${props.wide === true ? '' : ' rail'}`}
+    title={t('openWorkspace')}
+    aria-label={t('openWorkspace')}
+    onClick={openWorkspace}
+  >
+    <FolderCode size={18} aria-hidden="true" />
+    {props.wide === true && <span>{t('files')}</span>}
   </button>
+}
+
+function PluginDetailActions(props: PluginDetailSlotProps): JSX.Element | null {
+  const { t } = useWorkspaceI18n()
+  if (props.subject?.kind !== 'bundle' || props.subject.pkg?.name !== 'dsh-workspace' || props.subject.pkg.enabled !== true) {
+    return null
+  }
+  return <div className="daw-root daw-plugin-actions" style={{ background: 'transparent' }}>
+    <button type="button" className="daw-command primary" onClick={openWorkspace}>
+      <FolderCode size={15} aria-hidden="true" /> {t('openWorkspace')}
+    </button>
+    <button type="button" className="daw-command" onClick={openSettings}>
+      <Settings size={15} aria-hidden="true" /> {t('workspaceSettings')}
+    </button>
+  </div>
 }
 
 function GlobalOverlay(): JSX.Element | null {
@@ -66,8 +106,20 @@ function GlobalOverlay(): JSX.Element | null {
       window.removeEventListener(OPEN_SETTINGS_EVENT, settingsListener)
     }
   }, [])
+  useEffect(() => {
+    if (surface !== 'workspace') return
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      if (document.querySelector('[data-daw-nested-dialog="true"]') !== null) return
+      event.preventDefault()
+      setReturnToWorkspace(false)
+      setSurface('closed')
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => { window.removeEventListener('keydown', onKeyDown) }
+  }, [surface])
   const stableApi = useMemo(() => api, [])
-  return <>
+  const content = <>
     <WorkspaceOverlay
       api={stableApi}
       mounted={surface === 'workspace' || returnToWorkspace}
@@ -86,6 +138,10 @@ function GlobalOverlay(): JSX.Element | null {
       setReturnToWorkspace(false)
     }} />
   </>
+  if (typeof document !== 'undefined' && document.body !== null) {
+    return createPortal(content, document.body)
+  }
+  return content
 }
 
 function openSettings(): void {

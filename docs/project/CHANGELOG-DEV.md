@@ -1,5 +1,13 @@
 # 开发日志
 
+## 2026-11-22 · v1.3.0
+
+- 完成 `DESKTOP-001`：全面适配 DeepSeek Harness 桌面客户端（`profile=desktop`，Electron `dsh-app://app`）：
+  - 包元数据与插件管理页集成：新增 `locale/zh.json`、`locale/en.json`（含 `meta.title`、`meta.description` 与相对路径 `meta.detail`）及 `assets/icon.svg` 图标导出，并在 `plugins.detail.actions` 注册“打开文件工作区 / 工作区设置”快捷操作；侧栏入口升级为贴合 DSH 桌面与 WebUI 的原生行样式。
+  - Host 桌面生命周期与多实例容错：未显式传入 `dataDir` 时默认解析到 `DSH_HOME/dsh-workspace`（避免桌面客户端工作目录位于只读安装目录时写入失败）；`AuthService` 支持回环地址下的 `Origin: dsh-app://app`；启动时若默认监听端口（如 `3090`）已被本机其他 DSH 实例占用，自动平滑回退到临时回环端口并在设置页给出提示，避免触发桌面客户端 Fatal Recovery 崩溃弹窗或覆写共享数据库 `remote_enabled`。
+  - Electron 窗口交互与原生能力桥接：Overlay 改为 `createPortal(..., document.body)` 挂载并声明 `-webkit-app-region: no-drag`，自动根据 `html[data-windows-titlebar]`（40px）与 `html[data-platform="darwin"]`（48px）避让原生窗口控制按钮与拖拽区；接入桌面端 `window.__DSH_DIRECTORY_PICKER__` 原生文件夹选择器与 `window.dshDesktop.fileActions.save` 原生另存为对话框；将阻塞渲染进程的 `window.confirm` 全部替换为支持 `Escape` 关闭的应用内 `ConfirmDialog`，并新增配对码一键复制按钮。
+  - 自动化与双 profile 验证：新增 `tests/desktop-compat.spec.ts`、扩展 Playwright 桌面桥接与标题栏避让 E2E、扩展 `scripts/smoke-profile-install.ts` 同时验证 `web` 与 `desktop` 双 profile 安装和配置组合。
+
 ## 2026-11-20 · v1.2.0
 
 - 完成 `DSH-003`：全面适配 DeepSeek Harness `dsh-v0.2.2-rc.5`（npm `@deepseek-ai/dsh@0.2.2-rc.5`）并修复 v1.1.0 遗留的多个严重运行时缺陷：

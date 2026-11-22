@@ -29,6 +29,7 @@ export interface RemoteControl {
     configuredHost: string
     configuredPort: number
     remoteEnabled: boolean
+    fallbackCode?: string
     operation?: RemoteOperationView
   }
   enable(rootIds: string[], scopes: DeviceScope[]): RemoteOperationView
